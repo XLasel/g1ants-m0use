@@ -1,0 +1,85 @@
+# Распознавание речи на Android (роль 2)
+
+Модуль `speech` читает аудио и распознаёт речь локально, а `app` — временный экран для замеров на телефоне.
+
+**Статус:** проект собирается, а 15 модульных тестов проходят. На телефоне код ещё не запускался.
+
+## Что внутри
+
+| Файл в `speech` | За что отвечает |
+|---|---|
+| `Contracts.kt` | Общие `Word`, `AudioDecoder`, `Recognizer` |
+| `MediaCodecAudioDecoder.kt` | Файл → звук 16 кГц, моно |
+| `Pcm.kt` | Сведение каналов и смена частоты |
+| `ModelInstaller.kt` | Копирование модели из APK во внутреннюю память |
+| `SherpaRecognizer.kt` | GigaAM v3 через sherpa-onnx |
+| `TokenWords.kt` | Токены → слова с таймкодами |
+| `QuietChunker.kt` | Временная нарезка, пока нет `plan_chunks` от роли 3 |
+
+## Как собрать
+
+Нужны Android SDK (API 36) и JDK. Проверено на Java 25, на Java 27 сборка не проверялась. Команды выполняются из папки `android`, переменная `ANDROID_HOME` должна указывать на SDK.
+
+```bash
+./scripts/prepare_speech.sh
+```
+
+Дальше откройте папку `android` в Android Studio или соберите из терминала:
+
+```bash
+./gradlew :speech:testDebugUnitTest :app:assembleDebug
+```
+
+Если при первой сборке обрывается соединение, запустите команду ещё раз: уже скачанные зависимости сохраняются.
+
+## Как замерить на телефоне
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+```bash
+adb shell mkdir -p /sdcard/Android/data/ru.stenographer.speechbench/files
+```
+
+```bash
+adb push ../voicerec-poc/test_2.m4a /sdcard/Android/data/ru.stenographer.speechbench/files/
+```
+
+```bash
+adb shell am start -n ru.stenographer.speechbench/.MainActivity --es file test_2.m4a --ei threads 4
+```
+
+```bash
+adb logcat -s SpeechBench
+```
+
+Когда в журнале появится `DONE`, заберите результат и сравните его с Mac:
+
+```bash
+adb pull /sdcard/Android/data/ru.stenographer.speechbench/files/bench_test_2.m4a.4.json
+```
+
+```bash
+python3 scripts/compare_words.py bench_test_2.m4a.4.json ../voicerec-original/results/onnx/test_2.int8.json
+```
+
+## Как подключить в приложение
+
+```kotlin
+val audio = MediaCodecAudioDecoder(context).decode(uri) { progress -> /* прогресс */ }
+val modelDir = ModelInstaller(context).install()
+val words = SherpaRecognizer.open(modelDir, threads = 4).use { it.transcribe(audio, chunks) }
+```
+
+`chunks` — куски речи как `началоМс..конецМс` от начала записи. Колбэки прогресса приходят не в главном потоке.
+
+В `build.gradle.kts` итогового приложения нужны `androidResources { noCompress += "onnx" }` и `abiFilters += "arm64-v8a"`.
+В манифесте нужен `android:largeHeap="true"`.
+
+## Ограничения
+
+- **Память на длинных записях:** вся запись лежит в одном `FloatArray`, а час звука занимает около 230 МБ, причём в конце чтения кратковременно нужна ещё одна копия. Для таких файлов нужна потоковая обработка.
+- **Место на устройстве:** модель хранится и в APK, и во внутренней памяти, это ещё около 232 МБ.
+- **Совместимость с диаризацией:** выбран AAR со статически встроенным ONNX Runtime. Работу рядом с `onnxruntime-android` нужно проверить в одном APK.
+- **Язык:** GigaAM v3 распознаёт только русский.

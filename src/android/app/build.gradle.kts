@@ -1,0 +1,28 @@
+plugins {
+    id("com.android.application")
+}
+
+android {
+    namespace = "ru.stenographer.speechbench"
+    compileSdk = 36
+    defaultConfig {
+        applicationId = "ru.stenographer.speechbench"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 1
+        versionName = "0.1"
+        ndk { abiFilters += "arm64-v8a" }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    // Настройка действует в приложении, а не в библиотеке: без неё модели сжимаются в APK и дольше копируются.
+    androidResources { noCompress += "onnx" }
+}
+
+dependencies {
+    implementation(project(":speech"))
+    implementation("androidx.activity:activity-ktx:1.13.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+}
