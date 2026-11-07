@@ -1,5 +1,6 @@
 package ru.stenographer.diarization
 
+import ru.stenographer.core.Word
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
@@ -21,10 +22,10 @@ class Reference private constructor(val name: String, private val dir: File) {
     fun chunk(i: Int): JSONObject = JSONObject(json("cache_%02d".format(i)))
     fun hasWords(): Boolean = File(dir, "words_in.json").isFile
 
-    fun words(): List<AsrWord> = JSONArray(json("words_in")).let { a ->
+    fun words(): List<Word> = JSONArray(json("words_in")).let { a ->
         List(a.length()) {
             val w = a.getJSONObject(it)
-            AsrWord(w.getString("text"), toMs(w.getDouble("start")), toMs(w.getDouble("end")))
+            Word(w.getString("text"), toMs(w.getDouble("start")), toMs(w.getDouble("end")))
         }
     }
 

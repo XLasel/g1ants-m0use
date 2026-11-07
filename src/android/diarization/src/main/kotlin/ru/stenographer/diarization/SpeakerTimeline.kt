@@ -1,7 +1,6 @@
 package ru.stenographer.diarization
 
-/** Отрезок, где говорит спикер. Отрезки разных спикеров могут пересекаться (перебивания). */
-data class Segment(val speakerId: String, val startMs: Long, val endMs: Long)
+import ru.stenographer.core.Segment
 
 /** Голос впервые уверенно прозвучал в момент [firstAtMs]. */
 data class FoundSpeaker(val speakerId: String, val firstAtMs: Long)
@@ -35,12 +34,6 @@ class SpeakerIds {
     fun idOf(column: Int): String {
         if (byColumn[column] < 0) byColumn[column] = count++
         return "speaker_${byColumn[column] + 1}"
-    }
-
-    /** Порядковый номер с нуля для [Utterance.speaker]. */
-    internal fun indexOf(column: Int): Int {
-        idOf(column)
-        return byColumn[column]
     }
 
     fun isKnown(column: Int): Boolean = byColumn[column] >= 0
@@ -125,11 +118,4 @@ class SegmentTracker(
             return tracker.segments
         }
     }
-}
-
-/** Реплики с номерами спикеров из [ids], согласованными с найденными голосами и отрезками. */
-fun List<Utterance>.withSpeakerIds(ids: SpeakerIds): List<Utterance> = map { u ->
-    // Столбец, у которого не было ни одного отрезка, получает следующий свободный номер.
-    val speaker = ids.indexOf(u.speaker)
-    u.copy(speaker = speaker, words = u.words.map { it.copy(speaker = speaker) })
 }

@@ -2,9 +2,6 @@ package ru.stenographer.diarization
 
 import kotlin.math.floor
 
-/** Частота звука, которую ждёт модель. */
-const val SAMPLE_RATE = 16_000
-
 /** Шаг вероятностей диаризации: 10 мс. */
 const val FRAME_MS = 10L
 

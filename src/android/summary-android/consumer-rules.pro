@@ -1,0 +1,1 @@
+-keep class ru.stenographer.summary.android.NativeLlama { *; }

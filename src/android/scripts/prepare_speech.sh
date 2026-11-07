@@ -14,6 +14,7 @@ ASSETS="$ROOT/speech/src/main/assets/models/gigaam"
 FILES=(encoder.int8.onnx decoder.onnx joiner.onnx tokens.txt)
 
 if [ "${1:-}" != "--models-only" ]; then
+  mkdir -p "$ROOT/speech/libs"
   # Имя файла в flatDir должно быть <имя>-<версия>.aar, как в speech/build.gradle.kts.
   if [ ! -f "$ROOT/speech/libs/$AAR" ]; then
     curl -fL --retry 3 -o "$ROOT/speech/libs/$AAR.part" "$BASE/v$VERSION/$AAR"

@@ -1,0 +1,55 @@
+{
+  "model_file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+  "summary": {
+    "text": "Тема\n\u2022 Нужно подготовить приложение к демонстрации.\n\nРешения\n\u2022 Договорились: сначала проверка экспорта, потом сборка.\n\u2022 По скорости пока решения нет, сначала нужны замеры.\n\nЗадачи\n\u2022 Я, Анна, проверю экспорт JSON сегодня к девятнадцати часам.\n\u2022 Я, Игорь, соберу APK после проверки экспорта.",
+    "title": "Подготовка к демонстрации приложения",
+    "points": [
+      {
+        "source_start_ms": 0,
+        "text": "Нужно подготовить приложение к демонстрации."
+      },
+      {
+        "source_start_ms": 15500,
+        "text": "Договорились: сначала проверка экспорта, потом сборка."
+      },
+      {
+        "source_start_ms": 20500,
+        "text": "По скорости пока решения нет, сначала нужны замеры."
+      },
+      {
+        "source_start_ms": 4500,
+        "text": "Я, Анна, проверю экспорт JSON сегодня к девятнадцати часам."
+      },
+      {
+        "source_start_ms": 10500,
+        "text": "Я, Игорь, соберу APK после проверки экспорта."
+      }
+    ]
+  },
+  "utterances": 6,
+  "context_size": 4096,
+  "model_closed": true,
+  "os": "Linux",
+  "point_text_is_source_excerpt": true,
+  "kind": "summary_host_inference",
+  "threads": 4,
+  "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "input_kind": "transcript_not_audio",
+  "validation_scope": "JSON, source excerpts, timestamps and lifecycle; not a semantic quality score",
+  "load_ms": 889,
+  "model_bytes": 1117320736,
+  "model_sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+  "java": "17.0.20",
+  "peak_rss_mb": 1923,
+  "calls": [{
+    "raw_json": "{\"title\":\"Подготовка к демонстрации приложения\",\"topic\":{\"source_id\":0},\"decisions\":[{\"source_id\":3},{\"source_id\":4}],\"tasks\":[{\"source_id\":1},{\"source_id\":2}]}",
+    "prompt_tokens": 446,
+    "generation_ms": 19106,
+    "output_chars": 160
+  }],
+  "success": true,
+  "total_ms": 20224,
+  "transcript_unchanged": true,
+  "arch": "amd64",
+  "transcript_sha256": "cf6bf216eba65161ae03645e8b95a2f8288cdcdaeeea3ed32a9bbb329d583cb0"
+}

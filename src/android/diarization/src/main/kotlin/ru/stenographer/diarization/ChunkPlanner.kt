@@ -1,5 +1,6 @@
 package ru.stenographer.diarization
 
+import ru.stenographer.core.SAMPLE_RATE
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong

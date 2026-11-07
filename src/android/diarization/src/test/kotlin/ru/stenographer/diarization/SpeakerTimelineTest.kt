@@ -1,5 +1,7 @@
 package ru.stenographer.diarization
 
+import ru.stenographer.core.Word
+import ru.stenographer.core.Segment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,8 +47,8 @@ class SpeakerTimelineTest {
         val result = SegmentTracker()
         result.feed(data, 0, 500)
         result.finish()
-        val words = listOf(AsrWord("раз", 500, 800), AsrWord("два", 3_000, 3_300))
-        val utterances = TranscriptMerger.merge(words, FrameProbs(data)).withSpeakerIds(result.speakers)
+        val words = listOf(Word("раз", 500, 800), Word("два", 3_000, 3_300))
+        val utterances = TranscriptMerger.merge(words, FrameProbs(data), result.speakers)
         assertEquals(listOf("speaker_1", "speaker_2"), utterances.map { it.speakerId })
     }
 
@@ -87,7 +89,7 @@ class SpeakerTimelineTest {
         val firstUpdate = updates.indexOfFirst { it.newSpeakers.isNotEmpty() }
         assertTrue(updates[firstUpdate].processedUntilMs < 60_000)
 
-        val utterances = TranscriptMerger.merge(ref.words(), result.probs).withSpeakerIds(result.speakers)
+        val utterances = TranscriptMerger.merge(ref.words(), result.probs, result.speakers)
         assertTrue(utterances.map { it.speakerId }.toSet().all { id -> found.any { it.speakerId == id } })
         println("dialog_10min: порций ${updates.size}, голосов ${found.size} (" +
             found.joinToString { "${it.speakerId} с ${it.firstAtMs / 1000} с" } + "), отрезков ${result.segments.size}, " +

@@ -1,5 +1,7 @@
 package ru.stenographer.diarization
 
+import ru.stenographer.core.Word
+import ru.stenographer.core.Utterance
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,12 +14,12 @@ class TranscriptMergerTest {
         return FrameProbs(data)
     }
 
-    private fun word(text: String, startMs: Long, endMs: Long = startMs + 300) = AsrWord(text, startMs, endMs)
+    private fun word(text: String, startMs: Long, endMs: Long = startMs + 300) = Word(text, startMs, endMs)
 
     @Test fun `слова получают спикера по времени и собираются в реплики`() {
         val p = probs(600, 0 to 0..249, 1 to 300..599)
         val words = listOf(word("Привет,", 100), word("как", 1_200), word("дела?", 1_600), word("Хорошо.", 3_500))
-        val utterances = TranscriptMerger.merge(words, p)
+        val utterances = TranscriptMerger.merge(words, p, SpeakerIds())
         assertEquals(2, utterances.size)
         assertEquals("speaker_1", utterances[0].speakerId)
         assertEquals("Привет, как дела?", utterances[0].text)
@@ -46,12 +48,12 @@ class TranscriptMergerTest {
     }
 
     @Test fun `пустой список слов`() {
-        assertEquals(emptyList<Utterance>(), TranscriptMerger.merge(emptyList(), probs(10)))
+        assertEquals(emptyList<Utterance>(), TranscriptMerger.merge(emptyList(), probs(10), SpeakerIds()))
     }
 
     @Test fun `реплики совпадают с Python на вероятностях Python`() {
         for (ref in Reference.all().filter { it.hasWords() }) {
-            val actual = TranscriptMerger.merge(ref.words(), FrameProbs(ref.floats("probs")))
+            val actual = TranscriptMerger.turns(ref.words(), FrameProbs(ref.floats("probs")))
             val expected = ref.utterances()
             assertEquals("${ref.name}: число реплик", expected.length(), actual.size)
             for (i in actual.indices) {
@@ -71,7 +73,7 @@ class TranscriptMergerTest {
         val ref = Reference.load("dialog_10min")
         val words = ref.words()
         val probs = NemotronDiarizerTest.diarizer.diarize(ref.floats("audio"))
-        val actual = TranscriptMerger.merge(words, probs).flatMap { it.words }
+        val actual = TranscriptMerger.turns(words, probs).flatMap { it.words }
         val expected = ref.utterances().let { a ->
             (0 until a.length()).flatMap { i ->
                 val ws = a.getJSONObject(i).getJSONArray("words")

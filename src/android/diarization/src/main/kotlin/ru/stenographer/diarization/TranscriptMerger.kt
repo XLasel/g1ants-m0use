@@ -1,12 +1,11 @@
 package ru.stenographer.diarization
 
+import ru.stenographer.core.Utterance
+import ru.stenographer.core.Word
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.round
-
-/** Слово от распознавания, таймкоды в мс от начала записи. Совпадает по смыслу с `speech.Word`. */
-data class AsrWord(val text: String, val startMs: Long, val endMs: Long)
 
 /** Слово со спикером. [speaker] — номер столбца диаризации с нуля, [confidence] — его средняя вероятность. */
 data class SpeakerWord(
@@ -17,12 +16,9 @@ data class SpeakerWord(
     val confidence: Float,
 )
 
-/** Реплика: подряд идущие слова одного спикера. */
-data class Utterance(val speaker: Int, val startMs: Long, val endMs: Long, val words: List<SpeakerWord>) {
+/** Реплика внутри модуля: подряд идущие слова одного столбца Nemotron. Наружу уходит [Utterance] из `:core`. */
+data class Turn(val speaker: Int, val startMs: Long, val endMs: Long, val words: List<SpeakerWord>) {
     val text: String get() = words.joinToString(" ") { it.text }
-
-    /** Как в формате задания: speaker_1, speaker_2, ... */
-    val speakerId: String get() = "speaker_${speaker + 1}"
 }
 
 /**
@@ -35,12 +31,27 @@ object TranscriptMerger {
     private val SENTENCE_END = charArrayOf('.', '?', '!', '…')
     private const val SOFT_END = ",:;—-"
 
-    /** Вся цепочка: спикеры словам, затем реплики. */
-    fun merge(words: List<AsrWord>, probs: FrameProbs, maxGapMs: Long = 2_000): List<Utterance> =
+    /**
+     * Вся цепочка: спикеры словам, затем реплики. Номера спикеров берутся из [ids] диаризации, поэтому совпадают
+     * с найденными голосами и отрезками; столбец без отрезков получает следующий свободный номер.
+     */
+    fun merge(words: List<Word>, probs: FrameProbs, ids: SpeakerIds, maxGapMs: Long = 2_000): List<Utterance> =
+        turns(words, probs, maxGapMs).map { turn ->
+            Utterance(
+                speakerId = ids.idOf(turn.speaker),
+                startMs = turn.startMs,
+                endMs = turn.endMs,
+                text = turn.text,
+                words = turn.words.map { Word(it.text, it.startMs, it.endMs) },
+            )
+        }
+
+    /** Реплики с номерами столбцов Nemotron, как в merge.py прототипа. */
+    fun turns(words: List<Word>, probs: FrameProbs, maxGapMs: Long = 2_000): List<Turn> =
         mergeAdjacent(buildUtterances(assignSpeakers(words, probs), maxGapMs), maxGapMs)
 
     /** Спикер каждого слова по средней вероятности на интервале слова, затем сглаживание ошибок на границах. */
-    fun assignSpeakers(words: List<AsrWord>, probs: FrameProbs, smooth: Boolean = true): List<SpeakerWord> {
+    fun assignSpeakers(words: List<Word>, probs: FrameProbs, smooth: Boolean = true): List<SpeakerWord> {
         if (words.isEmpty()) return emptyList()
         val idx = IntArray(words.size) { -1 }
         val scores = Array(words.size) { FloatArray(NUM_SPEAKERS) }
@@ -78,22 +89,22 @@ object TranscriptMerger {
     }
 
     /** Группирует подряд идущие слова одного спикера в реплики. */
-    fun buildUtterances(words: List<SpeakerWord>, maxGapMs: Long = 2_000): List<Utterance> {
-        val result = ArrayList<Utterance>()
+    fun buildUtterances(words: List<SpeakerWord>, maxGapMs: Long = 2_000): List<Turn> {
+        val result = ArrayList<Turn>()
         for (w in words.sortedBy { it.startMs }) {
             val last = result.lastOrNull()
             if (last != null && last.speaker == w.speaker && sec(w.startMs) - sec(last.endMs) <= sec(maxGapMs)) {
                 result[result.lastIndex] = last.copy(endMs = max(last.endMs, w.endMs), words = last.words + w)
             } else {
-                result += Utterance(w.speaker, w.startMs, w.endMs, listOf(w))
+                result += Turn(w.speaker, w.startMs, w.endMs, listOf(w))
             }
         }
         return result
     }
 
     /** Сортирует реплики и склеивает соседние реплики одного спикера. */
-    fun mergeAdjacent(utterances: List<Utterance>, maxGapMs: Long = 2_000): List<Utterance> {
-        val result = ArrayList<Utterance>()
+    fun mergeAdjacent(utterances: List<Turn>, maxGapMs: Long = 2_000): List<Turn> {
+        val result = ArrayList<Turn>()
         for (u in utterances.sortedBy { it.startMs }) {
             val last = result.lastOrNull()
             if (last != null && last.speaker == u.speaker && sec(u.startMs) - sec(last.endMs) <= sec(maxGapMs)) {
@@ -106,7 +117,7 @@ object TranscriptMerger {
     }
 
     /** Одиночное слово «чужого» спикера посреди плотной речи другого — обычно дрожание границы. */
-    private fun smoothIsolated(words: List<AsrWord>, idx: IntArray, scores: Array<FloatArray>) {
+    private fun smoothIsolated(words: List<Word>, idx: IntArray, scores: Array<FloatArray>) {
         for (i in 1 until words.size - 1) {
             val prev = idx[i - 1]
             if (prev != idx[i + 1] || idx[i] == prev) continue
@@ -121,7 +132,7 @@ object TranscriptMerger {
      * Уверенные решения диаризации (свой спикер от 0,6, спикер большинства меньше 0,25) не перезаписываются.
      */
     private fun sentenceMajority(
-        words: List<AsrWord>,
+        words: List<Word>,
         idx: IntArray,
         scores: Array<FloatArray>,
         pause: Double = 0.5,
@@ -151,7 +162,7 @@ object TranscriptMerger {
         }
     }
 
-    private fun isBoundary(cur: AsrWord, next: AsrWord, pause: Double): Boolean {
+    private fun isBoundary(cur: Word, next: Word, pause: Double): Boolean {
         if (cur.text.isNotEmpty() && cur.text.last() in SENTENCE_END) return true
         if (sec(next.startMs) - sec(cur.endMs) >= pause) return true
         // «каждого: Это точно» — знак препинания и заглавная буква тоже похожи на начало новой фразы

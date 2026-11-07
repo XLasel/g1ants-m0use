@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Кладёт модель Nemotron для диаризации в assets приложения. В git её нет: step_int8.onnx весит 103 МБ.
+# Кладёт модель Nemotron для диаризации в assets модуля pipeline. В git её нет: step_int8.onnx весит 103 МБ.
 #   ./scripts/prepare_diarization.sh                 ищет models_onnx в voicerec-original рядом с репозиторием
 #   ./scripts/prepare_diarization.sh путь/к/models_onnx
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ASSETS="$ROOT/app/src/main/assets/models/nemotron"
+ASSETS="$ROOT/pipeline/src/main/assets/models/nemotron"
 FILES=(embed.onnx step_int8.onnx mel_filters.bin silence_embeds.bin)
 
 if [ $# -ge 1 ]; then
@@ -27,4 +27,4 @@ for file in "${FILES[@]}"; do
     cp "$SOURCE/$file" "$ASSETS/$file"
   fi
 done
-echo "Модель готова: $(du -sh "$ASSETS" | cut -f1) в app/src/main/assets/models/nemotron"
+echo "Модель готова: $(du -sh "$ASSETS" | cut -f1) в pipeline/src/main/assets/models/nemotron"
