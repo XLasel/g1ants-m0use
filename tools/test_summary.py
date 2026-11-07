@@ -59,7 +59,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cache-dir", type=Path, default=Path(tempfile.gettempdir()) / "nuclear-summary-toolchain")
     parser.add_argument("--native-library-dir", type=Path, help="Optional host JNI library directory; does not run a model")
+    parser.add_argument("--model", type=Path, help="Run real GGUF host inference after unit tests")
+    parser.add_argument("--transcript", type=Path, help="Input JSON in the task's transcript format")
+    parser.add_argument("--report", type=Path, default=ROOT / "artifacts/test-results/summary-host.json")
+    parser.add_argument("--context-size", type=int, default=4096)
+    parser.add_argument("--threads", type=int, default=4)
     args = parser.parse_args()
+    if bool(args.model) != bool(args.transcript) or (args.model and not args.native_library_dir):
+        parser.error("--model and --transcript require each other and --native-library-dir")
     args.cache_dir.mkdir(parents=True, exist_ok=True)
     if not shutil.which("java"):
         raise SystemExit("JDK 17+ is required")
@@ -83,6 +90,11 @@ def main() -> None:
         subprocess.run(["java", "-cp", runtime_classpath, "org.junit.runner.JUnitCore", "ru.stenographer.summary.LocalSummarizerTest", "ru.stenographer.summary.android.SummaryWorkerTest"], check=True)
         if args.native_library_dir:
             subprocess.run(["java", "-Djava.library.path=" + str(args.native_library_dir.resolve()), "-cp", runtime_classpath, "ru.stenographer.summary.android.NativeBridgeHostSmoke"], check=True)
+        if args.model:
+            subprocess.run(["java", "-Xmx2g", "-Djava.library.path=" + str(args.native_library_dir.resolve()),
+                "-cp", runtime_classpath, "ru.stenographer.summary.android.SummaryHostBenchmark",
+                str(args.model.resolve()), str(args.transcript.resolve()), str(args.report.resolve()),
+                str(args.context_size), str(args.threads)], check=True)
 
 
 if __name__ == "__main__":

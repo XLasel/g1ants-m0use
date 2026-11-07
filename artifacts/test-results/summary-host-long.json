@@ -1,0 +1,91 @@
+{
+  "model_file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+  "summary": {
+    "text": "Тема\n\u2022 Нужно подготовить приложение к демонстрации.\n\nРешения\n\u2022 Договорились: сначала проверка экспорта, потом сборка.\n\u2022 Я, Игорь, соберу APK после проверки экспорта.\n\nЗадачи\n\u2022 По скорости пока решения нет, сначала нужны замеры.\n\u2022 Показ проведём завтра в десять.\n\u2022 Договорились: сначала проверка экспорта, потом сборка.",
+    "title": "Подготовка к демонстрации приложения",
+    "points": [
+      {
+        "source_start_ms": 0,
+        "text": "Нужно подготовить приложение к демонстрации."
+      },
+      {
+        "source_start_ms": 75500,
+        "text": "Договорились: сначала проверка экспорта, потом сборка."
+      },
+      {
+        "source_start_ms": 130500,
+        "text": "Я, Игорь, соберу APK после проверки экспорта."
+      },
+      {
+        "source_start_ms": 110500,
+        "text": "По скорости пока решения нет, сначала нужны замеры."
+      },
+      {
+        "source_start_ms": 145000,
+        "text": "Показ проведём завтра в десять."
+      },
+      {
+        "source_start_ms": 165500,
+        "text": "Договорились: сначала проверка экспорта, потом сборка."
+      }
+    ]
+  },
+  "utterances": 36,
+  "context_size": 1024,
+  "model_closed": true,
+  "os": "Linux",
+  "point_text_is_source_excerpt": true,
+  "kind": "summary_host_inference",
+  "threads": 4,
+  "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "input_kind": "transcript_not_audio",
+  "validation_scope": "JSON, source excerpts, timestamps and lifecycle; not a semantic quality score",
+  "load_ms": 885,
+  "model_bytes": 1117320736,
+  "model_sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+  "java": "17.0.20",
+  "peak_rss_mb": 1842,
+  "calls": [
+    {
+      "raw_json": "{\"title\":\"Проверка экспорт JSON и сборка APK\",\"topic\":{\"source_id\":0},\"decisions\":[{\"source_id\":1},{\"source_id\":2},{\"source_id\":3}],\"tasks\":[{\"source_id\":4},{\"source_id\":5},{\"source_id\":6}]}",
+      "prompt_tokens": 733,
+      "generation_ms": 11980,
+      "output_chars": 190
+    },
+    {
+      "raw_json": "{\"title\":\"Договоренности по этапам работы\",\"topic\":{\"source_id\":15},\"decisions\":[{\"source_id\":25},{\"source_id\":29}],\"tasks\":[{\"source_id\":22},{\"source_id\":26}] }",
+      "prompt_tokens": 734,
+      "generation_ms": 12052,
+      "output_chars": 161
+    },
+    {
+      "raw_json": "{\"title\":\"Подготовка к демонстрации приложения\",\"topic\":{\"source_id\":30},\"decisions\":[],\"tasks\":[\n{\"source_id\":31},\n{\"source_id\":32},\n{\"source_id\":33}\n]}",
+      "prompt_tokens": 452,
+      "generation_ms": 11443,
+      "output_chars": 153
+    },
+    {
+      "raw_json": "{\"title\":\"Проверка экспорт JSON и сборка APK\",\"topic\":{\"source_id\":0},\"decisions\":[{\"source_id\":15},{\"source_id\":29}],\"tasks\":[{\"source_id\":2},{\"source_id\":22},{\"source_id\":26}]}",
+      "prompt_tokens": 736,
+      "generation_ms": 16886,
+      "output_chars": 178
+    },
+    {
+      "raw_json": "{\"title\":\"Договоренность о порядке действий\",\"topic\":{\"source_id\":33},\"decisions\":[],\"tasks\":[]}",
+      "prompt_tokens": 295,
+      "generation_ms": 4794,
+      "output_chars": 96
+    },
+    {
+      "raw_json": "{\"title\":\"Подготовка к демонстрации приложения\",\"topic\":{\"source_id\":0},\"decisions\":[{\"source_id\":15},{\"source_id\":26}],\"tasks\":[{\"source_id\":22},{\"source_id\":29},{\"source_id\":33}]}",
+      "prompt_tokens": 479,
+      "generation_ms": 12938,
+      "output_chars": 181
+    }
+  ],
+  "success": true,
+  "total_ms": 71322,
+  "transcript_unchanged": true,
+  "arch": "amd64",
+  "transcript_sha256": "79b30c0334117972e68625c859aa688b99039d95cb50ea260a4946bd592512a9"
+}
