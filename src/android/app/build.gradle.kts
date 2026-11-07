@@ -27,6 +27,10 @@ android {
     }
     // Настройка действует в приложении, а не в библиотеке: без неё модели сжимаются в APK и дольше копируются.
     androidResources { noCompress += "onnx" }
+    // Только arm64: у sherpa-onnx для x86 лежит свой libonnxruntime.so и конфликтует с onnxruntime-android.
+    // Для arm64 рантайм у sherpa встроен в libsherpa-onnx-jni.so, конфликта нет. abiFilters выше этого не снимает:
+    // слияние нативных библиотек идёт по всем ABI до фильтра.
+    packaging { jniLibs { excludes += listOf("lib/x86/**", "lib/x86_64/**", "lib/armeabi-v7a/**") } }
 }
 
 dependencies {
