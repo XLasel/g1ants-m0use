@@ -9,11 +9,12 @@
 | `NemotronDiarizer.kt` | `onnx_diarizer.OnnxDiarizer` | Nemotron 3 Diarization через ONNX Runtime → вероятности [кадры × 8], шаг 10 мс |
 | `ChunkPlanner.kt` | `voicerec/segmentation.py` | Вероятности → куски речи до 20 с для `Recognizer.transcribe` |
 | `TranscriptMerger.kt` | `voicerec/merge.py` | Слова + вероятности → спикеры слов → реплики |
-| `TranscriptJson.kt` | — | Номера спикеров по порядку появления и экспорт в JSON задания |
+| `SpeakerTimeline.kt` | — | Отрезки голосов с перекрытиями и найденные голоса по ходу обработки, единые номера `speaker_N` |
+| `TranscriptJson.kt` | — | Экспорт в JSON задания |
 
 Модуль на чистом Kotlin/JVM, без Android: тесты идут на компьютере без SDK и телефона.
 
-**Статус:** 24 теста проходят, результат сверен с прототипом на трёх записях (2,1, 2,3 и 10,4 минуты, от 3 до 8 спикеров):
+**Статус:** 29 тестов проходят, результат сверен с прототипом на трёх записях (2,1, 2,3 и 10,4 минуты, от 3 до 8 спикеров):
 
 | Проверка | Результат |
 |---|---|
@@ -34,16 +35,25 @@
 ## Как пользоваться
 
 ```kotlin
-val probs = NemotronDiarizer.open(modelDir, threads = 4).use { diarizer ->
-    diarizer.diarize(audio) { progress, speakersFound -> /* прогресс и «Голосов: N» на экране */ }
+val diarization = NemotronDiarizer.open(modelDir, threads = 4).use { diarizer ->
+    diarizer.diarizeWithSegments(
+        audio,
+        onProgress = { progress, voices -> /* StageProgress(DIARIZE) */ },
+        onUpdate = { update ->
+            update.newSpeakers.forEach { /* SpeakerFound(it.speakerId, it.firstAtMs) */ }
+            /* Segments(update.segments, update.final) */
+        },
+    )
 }
-val chunks: List<LongRange> = ChunkPlanner.plan(probs, audio)        // вместо QuietChunker
-val words = recognizer.transcribe(audio, chunks)                      // speech.Word
+val chunks: List<LongRange> = ChunkPlanner.plan(diarization.probs, audio) // вместо QuietChunker
+val words = recognizer.transcribe(audio, chunks)                           // speech.Word
 val utterances = TranscriptMerger.merge(
-    words.map { AsrWord(it.text, it.startMs, it.endMs) }, probs,
-).renumberSpeakers()
+    words.map { AsrWord(it.text, it.startMs, it.endMs) }, diarization.probs,
+).withSpeakerIds(diarization.speakers)                                      // Done
 val json = TranscriptJson.encode(utterances) // {"transcript": [{"speaker_id", "start_ms", "end_ms", "text"}]}
 ```
+
+**Для интерфейса (контракт `PipelineEvent`):** голоса появляются по ходу обработки. После каждого куска (27 с звука) `onUpdate` получает новые голоса и закрытые отрезки; последняя порция — с `final = true`. Голос считается найденным, когда его отрезок дорос до 0,2 с, номера `speaker_N` идут по времени появления и не меняются до конца файла; те же номера получают реплики в JSON. Отрезки разных голосов могут пересекаться (перебивания), паузы одного голоса до 0,3 с склеиваются. На Pixel 7 Pro для test_2 первые два голоса приходят через 1,9 с после начала диаризации, третий — через 2,8 с, вся диаризация — 8,4 с.
 
 Модели загружаются по очереди: `NemotronDiarizer` закрывается до загрузки GigaAM. Готовый пример всей цепочки — `MainActivity` в `app` (бенч).
 

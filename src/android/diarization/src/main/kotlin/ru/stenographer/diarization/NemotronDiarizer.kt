@@ -51,10 +51,35 @@ class NemotronDiarizer private constructor(
 
     /**
      * @param audio звук 16 кГц, моно, от -1 до 1
-     * @param onProgress доля от 0 до 1 и число спикеров, найденных к этому моменту
+     * @param onProgress доля от 0 до 1 и число голосов, найденных к этому моменту
      */
     fun diarize(audio: FloatArray, onProgress: (Float, Int) -> Unit = { _, _ -> }): FrameProbs =
-        diarize(audio, onProgress) { _, _ -> }
+        diarizeWithSegments(audio, onProgress).probs
+
+    /**
+     * Диаризация с выдачей для интерфейса: после каждого куска (27 с звука) [onUpdate] получает голоса,
+     * найденные в этом куске, и закрытые отрезки (события `SpeakerFound` и `Segments`). Последняя порция
+     * приходит с `final = true`. Номера спикеров в результате те же, что в порциях.
+     */
+    fun diarizeWithSegments(
+        audio: FloatArray,
+        onProgress: (Float, Int) -> Unit = { _, _ -> },
+        onUpdate: (DiarizationUpdate) -> Unit = {},
+    ): DiarizationResult {
+        val tracker = SegmentTracker()
+        val probs = if (audio.size < HOP_LENGTH * SUBSAMPLING) {
+            FrameProbs(FloatArray(0))
+        } else {
+            val featureFrames = logMel.frameCount(audio.size)
+            val source = BlockEmbeds(audio, featureFrames)
+            runChunks(source.count, featureFrames, source::rows,
+                onFrames = { data, from, to -> tracker.feed(data, from, to).also { if (it.hasNews) onUpdate(it) } },
+                onProgress = { p -> onProgress(p, tracker.speakers.size) },
+                onChunk = { _, _ -> })
+        }
+        onUpdate(tracker.finish())
+        return DiarizationResult(probs, tracker.speakers, tracker.segments.sortedWith(compareBy({ it.startMs }, { it.speakerId })))
+    }
 
     internal fun diarize(
         audio: FloatArray,
@@ -64,7 +89,7 @@ class NemotronDiarizer private constructor(
         if (audio.size < HOP_LENGTH * SUBSAMPLING) return FrameProbs(FloatArray(0))
         val featureFrames = logMel.frameCount(audio.size)
         val source = BlockEmbeds(audio, featureFrames)
-        return runChunks(source.count, featureFrames, source::rows, onProgress, onChunk)
+        return runChunks(source.count, featureFrames, source::rows, { _, _, _ -> }, { onProgress(it, 0) }, onChunk)
     }
 
     /** Цикл по готовым эмбеддингам (для сверки с Python). */
@@ -73,7 +98,8 @@ class NemotronDiarizer private constructor(
         featureFrames: Int,
         onProgress: (Float, Int) -> Unit = { _, _ -> },
         onChunk: (Int, SpeakerCache) -> Unit = { _, _ -> },
-    ): FrameProbs = runChunks(embeds.size, featureFrames, { a, b -> embeds.subList(a, b) }, onProgress, onChunk)
+    ): FrameProbs = runChunks(embeds.size, featureFrames, { a, b -> embeds.subList(a, b) }, { _, _, _ -> },
+        { onProgress(it, 0) }, onChunk)
 
     /**
      * Эмбеддинги блоками по [blockFrames] кадров признаков. Блок получает по [BLOCK_CONTEXT] кадров с каждой
@@ -117,14 +143,14 @@ class NemotronDiarizer private constructor(
         total: Int,
         featureFrames: Int,
         rowsOf: (Int, Int) -> List<FloatArray>,
-        onProgress: (Float, Int) -> Unit,
+        onFrames: (FloatArray, Int, Int) -> Unit,
+        onProgress: (Float) -> Unit,
         onChunk: (Int, SpeakerCache) -> Unit,
     ): FrameProbs {
         val cache = SpeakerCache(silence)
         var chunkIndex = 0
         val output = FloatArray(featureFrames * NUM_SPEAKERS)
         var written = 0 // строк в output
-        val seen = BooleanArray(NUM_SPEAKERS)
         var start = 0
         while (start < total) {
             val end = min(start + CHUNK_LENGTH, total)
@@ -147,6 +173,7 @@ class NemotronDiarizer private constructor(
             cache.update(stepEmbeds, pooled, end - start)
             onChunk(chunkIndex++, cache)
 
+            val firstNew = written
             val first = context.size * SUBSAMPLING
             val last = min(first + (end - start) * SUBSAMPLING, logitRows)
             for (r in first until last) {
@@ -154,12 +181,12 @@ class NemotronDiarizer private constructor(
                 for (s in 0 until NUM_SPEAKERS) {
                     val p = sigmoid(logits[r * NUM_SPEAKERS + s])
                     output[written * NUM_SPEAKERS + s] = p
-                    if (p >= 0.5f) seen[s] = true
                 }
                 written++
             }
+            onFrames(output, firstNew, written)
             start = end
-            onProgress(start.toFloat() / total, seen.count { it })
+            onProgress(start.toFloat() / total)
         }
         return FrameProbs(if (written == featureFrames) output else output.copyOf(written * NUM_SPEAKERS))
     }
