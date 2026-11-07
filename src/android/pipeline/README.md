@@ -14,7 +14,7 @@ pipeline.process(fileId, uri).collect { event ->
         is PipelineEvent.Done -> { /* реплики; экспорт: TranscriptJson.encode(event.utterances) */ }
         is PipelineEvent.Summary -> { /* название, конспект, пункты со ссылками на моменты */ }
         is PipelineEvent.Failed -> { /* event.reason можно показать пользователю */ }
-        is PipelineEvent.SpeakerFeatures -> Unit // пока не отдаётся
+        is PipelineEvent.SpeakerFeatures -> { /* тон, интонация и громкость голоса для узора */ }
     }
 }
 ```
@@ -24,7 +24,7 @@ pipeline.process(fileId, uri).collect { event ->
 | Этап (`Stage`) | Что делает | События |
 |---|---|---|
 | `DECODE` | Чтение файла в 16 кГц моно (`:speech`) | `Decoded` |
-| `DIARIZE` | Установка и загрузка Nemotron, диаризация кусками по 27 с (`:diarization`) | `SpeakerFound`, `Segments` по ходу |
+| `DIARIZE` | Установка и загрузка Nemotron, диаризация кусками по 27 с (`:diarization`); затем тон и громкость каждого голоса | `SpeakerFound`, `Segments` по ходу; `SpeakerFeatures` в конце этапа |
 | `RECOGNIZE` | Куски речи по диаризации, установка и загрузка GigaAM, распознавание (`:speech`) | `Words` после каждого куска |
 | `MERGE` | Спикер каждому слову, реплики; номера `speaker_N` те же, что у найденных голосов | `Done` |
 | `SUMMARY` | Только если задана `summaryModel`: название и конспект (`:summary-android`) | `Summary` |
@@ -37,8 +37,18 @@ pipeline.process(fileId, uri).collect { event ->
 - **Поток холодный.** Обработка начинается при подписке; отмена подписки прерывает её между этапами и кусками распознавания. Сама диаризация одного файла не прерывается на середине (8 с на 3 минуты звука на Pixel 7 Pro).
 - **Ошибки — событием `Failed`**, исключение наружу не выбрасывается. Ошибка конспекта не трогает расшифровку: `Done` уже отдан, а `Summary` просто не придёт.
 - **Первый запуск** копирует модели из APK во внутреннюю память (около 330 МБ, несколько секунд), это входит в этапы `DIARIZE` и `RECOGNIZE`.
-- **Приложению** нужны `androidResources { noCompress += "onnx" }`, только `arm64-v8a` (см. `packaging` в `bench/build.gradle.kts`) и `android:largeHeap="true"` в манифесте.
+- **Приложению** нужны `androidResources { noCompress += listOf("onnx", "gguf") }`, только `arm64-v8a` (см. `packaging` в `bench/build.gradle.kts`) и `android:largeHeap="true"` в манифесте.
 
 ## Модели
 
-Модель диаризации лежит в assets этого модуля, её кладёт `../scripts/prepare_diarization.sh`. GigaAM — в assets `:speech` (`../scripts/prepare_speech.sh`). Модель конспекта (GGUF) в APK не входит: путь передаётся в `PipelineConfig.summaryModel`, импорт — `GgufModelStore` из `:summary-android`.
+Все модели лежат в APK и при первом запуске копируются во внутреннюю память, интернет не нужен:
+
+| Модель | Где | Кладёт |
+|---|---|---|
+| GigaAM v3, 222 МБ | assets `:speech` | `../scripts/prepare_speech.sh` |
+| Nemotron, 106 МБ | assets `:pipeline` | `../scripts/prepare_diarization.sh` |
+| Qwen2.5-1.5B Q4_K_M, 1,1 ГБ | assets `:pipeline` | `../scripts/prepare_summary.sh` |
+
+Копирование (около 1,4 ГБ) можно сделать заранее на первом запуске приложения: `pipeline.installModels { progress -> }`. Иначе оно пройдёт на первой обработке. Если Qwen в APK не положен, конспект не делается; свой GGUF можно передать в `PipelineConfig.summaryModel` (импорт — `GgufModelStore` из `:summary-android`). Конспект отключается `PipelineConfig(summaryEnabled = false)`.
+
+Приложению нужно `androidResources { noCompress += listOf("onnx", "gguf") }`: без этого модели сжимаются в APK и копируются в разы дольше.

@@ -19,3 +19,5 @@ dependencyResolutionManagement {
 rootProject.name = "stenographer"
 include(":core", ":speech", ":diarization", ":pipeline", ":bench")
 include(":summary", ":summary-android")
+// Приложение для пользователя: интерфейс поверх :pipeline
+include(":app")

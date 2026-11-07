@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Реплика</string>
+    <string name="share_target">Расшифровать</string>
+    <string name="notif_recording">Идёт запись</string>
+    <string name="notif_processing">Расшифровываю запись</string>
+    <string name="notif_done">Расшифровка готова</string>
+    <string name="channel_recording">Запись</string>
+    <string name="channel_processing">Обработка</string>
+    <string name="channel_done">Готовые расшифровки</string>
+</resources>

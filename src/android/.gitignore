@@ -9,3 +9,5 @@ speech/src/main/assets/models/
 .kotlin/
 # Модель диаризации: её кладёт scripts/prepare_diarization.sh
 pipeline/src/main/assets/models/nemotron/
+# Модель конспекта: её кладёт scripts/prepare_summary.sh
+pipeline/src/main/assets/models/summary/
