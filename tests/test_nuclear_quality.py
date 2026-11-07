@@ -243,6 +243,52 @@ class AndroidBenchmarkTests(unittest.TestCase):
         self.assertEqual(report["rtf"], 0.5)
         self.assertTrue(any("rtf" in item for item in report["warnings"]))
 
+    def test_pipeline_separates_transcription_and_summary_time(self):
+        self.data.update(transcription_ms=1500, processing_ms=6000, summary_status="success",
+                         processing_scope="until_flow_completion_before_export")
+        self.data["timings_ms"] = {"decode": 200, "diarize": 400, "recognize": 800, "merge": 10, "summary": 4500}
+        self.write()
+        report = quality.score_benchmark(self.ref, self.bench)
+        self.assertEqual(report["input_format"], "android_pipeline_words")
+        self.assertEqual(report["elapsed_seconds"], 1.5)
+        self.assertEqual(report["rtf"], 0.5)
+        self.assertEqual(report["full_elapsed_seconds"], 6)
+        self.assertEqual(report["full_rtf"], 2)
+        self.assertEqual(report["summary_status"], "success")
+        self.assertIn("before export", report["full_timing_scope"])
+        self.assertEqual(report["warnings"], [])
+
+    def test_pipeline_invalid_transcription_time_is_rejected(self):
+        for value in (-1, 1501, True, 100.0, "100", None):
+            with self.subTest(value=value):
+                self.data["transcription_ms"] = value
+                self.write()
+                with self.assertRaises(quality.InputError):
+                    quality.score_benchmark(self.ref, self.bench)
+
+    def test_failed_pipeline_is_not_scored_as_success(self):
+        for key, value in (("failed", "decoder error"), ("success", False)):
+            with self.subTest(key=key):
+                self.data[key] = value
+                self.write()
+                with self.assertRaises(quality.InputError):
+                    quality.score_benchmark(self.ref, self.bench)
+                del self.data[key]
+
+    def test_summary_failure_preserves_valid_transcription_score(self):
+        self.data.update(transcription_ms=1500, processing_ms=3000, summary_status="failed")
+        self.write()
+        report = quality.score_benchmark(self.ref, self.bench)
+        self.assertEqual(report["rtf"], 0.5)
+        self.assertEqual(report["full_rtf"], 1)
+        self.assertEqual(report["summary_status"], "failed")
+        self.assertIn("may include export", report["full_timing_scope"])
+
+    def test_legacy_benchmark_has_no_claim_of_full_pipeline_rtf(self):
+        report = quality.score_benchmark(self.ref, self.bench)
+        self.assertIsNone(report["full_rtf"])
+        self.assertIsNone(report["full_elapsed_seconds"])
+
     def test_scope_mismatch_is_visible(self):
         self.data["timings_ms"]["asr"] = 700
         self.write()
