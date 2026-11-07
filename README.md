@@ -15,7 +15,13 @@
 
 Команда **MISIS G1ants** (НИТУ МИСИС, прикладная информатика), хакатон Nuclear IT Hack 2026.
 
-_Скриншоты главного экрана, обработки и расшифровки — добавить._
+<p>
+  <img src="artifacts/demo/screenshots/01-home.png" width="150" alt="Главный экран: записи с узорами голосов">
+  <img src="artifacts/demo/screenshots/02-processing.png" width="150" alt="Обработка: голоса находятся по ходу">
+  <img src="artifacts/demo/screenshots/03-transcript.png" width="150" alt="Расшифровка с дорожками голосов">
+  <img src="artifacts/demo/screenshots/05-voices.png" width="150" alt="Голоса: доля разговора и высота голоса">
+  <img src="artifacts/demo/screenshots/06-export.png" width="150" alt="Экспорт JSON в формате задания">
+</p>
 
 ## Что умеет
 
