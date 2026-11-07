@@ -93,6 +93,24 @@ class NemotronDiarizerTest {
         }
     }
 
+    @Test fun `блоки эмбеддингов дают тот же результат, что вся запись сразу`() {
+        val audio = Reference.load("ru_3spk").floats("audio")
+        val d = diarizer
+        val saved = d.blockFrames
+        try {
+            d.blockFrames = 1_000_000 // одним блоком, как в прототипе
+            val whole = d.diarize(audio)
+            d.blockFrames = 800 // 8 с: границ блоков много, в том числе внутри чанков
+            val blocks = d.diarize(audio)
+            assertEquals(whole.data.size, blocks.data.size)
+            val diff = Diff.of(whole.data, blocks.data)
+            println("ru_3spk: блоки по 8 с против целой записи $diff")
+            assertEquals(0f, diff.max)
+        } finally {
+            d.blockFrames = saved
+        }
+    }
+
     @Test fun `короткий звук даёт пустой результат`() {
         assertEquals(0, diarizer.diarize(FloatArray(1000)).frames)
     }

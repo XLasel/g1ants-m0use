@@ -38,14 +38,16 @@ internal class LogMel(private val melFilters: FloatArray) {
     fun frameCount(samples: Int): Int = samples / HOP_LENGTH
 
     /** Звук 16 кГц → [кадры, 128] по строкам. */
-    fun compute(audio: FloatArray): FloatArray {
-        val frames = frameCount(audio.size)
-        val result = FloatArray(frames * MEL_BINS)
+    fun compute(audio: FloatArray): FloatArray = compute(audio, 0, frameCount(audio.size))
+
+    /** Только кадры [from, to): каждый кадр зависит лишь от звука вокруг себя, поэтому блоки совпадают с целым. */
+    fun compute(audio: FloatArray, from: Int, to: Int): FloatArray {
+        val result = FloatArray((to - from) * MEL_BINS)
         val re = DoubleArray(N_FFT)
         val im = DoubleArray(N_FFT)
         val power = FloatArray(SPECTRUM_BINS)
         val pad = N_FFT / 2
-        for (frame in 0 until frames) {
+        for (frame in from until to) {
             val offset = frame * HOP_LENGTH - pad // начало окна в исходном звуке
             for (j in 0 until N_FFT) {
                 re[j] = (emphasized(audio, offset + j) * window[j]).toDouble()
@@ -53,7 +55,7 @@ internal class LogMel(private val melFilters: FloatArray) {
             }
             fft.transform(re, im)
             for (k in 0 until SPECTRUM_BINS) power[k] = (re[k] * re[k] + im[k] * im[k]).toFloat()
-            val out = frame * MEL_BINS
+            val out = (frame - from) * MEL_BINS
             for (m in 0 until MEL_BINS) {
                 val row = m * SPECTRUM_BINS
                 var sum = 0.0
