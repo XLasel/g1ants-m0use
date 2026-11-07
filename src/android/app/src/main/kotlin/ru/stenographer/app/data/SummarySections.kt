@@ -12,14 +12,23 @@ data class SummarySection(val title: String, val items: List<SummaryItem>, val w
  * Слова попроще, чем «решения и задачи»: запись бывает и не рабочей. Пустые разделы не показываются.
  */
 private val SECTION_TITLES = mapOf("Тема" to "О чём разговор", "Решения" to "Договорились", "Задачи" to "Кто что сделает")
+private val SECTION_KINDS = mapOf("Тема" to "topic", "Решения" to "decision", "Задачи" to "task")
 
 /**
- * Модель отдаёт конспект текстом «Тема / Решения / Задачи» с пунктами через «•».
- * Пункты — дословные фрагменты реплик, поэтому время и голос берём из расшифровки.
- * Если формат другой, возвращаем null и показываем текст как есть.
+ * Новые пункты уже содержат раздел и точную привязку к голосу. Одинаковые фразы
+ * разных участников поэтому не путаются. Для сохранённых записей старого формата
+ * разбираем текст «Тема / Решения / Задачи» и восстанавливаем голос по времени.
+ * Если старый формат не распознан, возвращаем null и показываем текст как есть.
  */
 fun summarySections(rec: Recording): List<SummarySection>? {
     val s = rec.summary ?: return null
+    if (s.points.isNotEmpty() && s.points.all { it.kind in SECTION_KINDS.values && !it.speakerId.isNullOrBlank() }) {
+        return SECTION_TITLES.mapNotNull { (header, title) ->
+            val items = s.points.filter { it.kind == SECTION_KINDS.getValue(header) }
+                .map { SummaryItem(it.text, it.sourceStartMs, summarySpeaker(rec, it.text, it.sourceStartMs, it.speakerId)) }
+            SummarySection(title, items, withSpeaker = header == "Задачи").takeIf { items.isNotEmpty() }
+        }.ifEmpty { null }
+    }
     val blocks = s.text.split(Regex("\n\\s*\n")).map { it.trim() }.filter { it.isNotEmpty() }
     val sections = blocks.mapNotNull { block ->
         val lines = block.lines()
@@ -29,13 +38,22 @@ fun summarySections(rec: Recording): List<SummarySection>? {
             .map { it.trim().removePrefix("•").trim() }
             .filter { it.isNotEmpty() && it != "—" }
             .map { text ->
-                val at = s.points.firstOrNull { it.text == text }?.sourceStartMs
-                SummaryItem(text, at, at?.let { t -> rec.utterances.firstOrNull { t in it.startMs..it.endMs }?.speakerId })
+                val point = s.points.firstOrNull { it.text == text }
+                val at = point?.sourceStartMs
+                SummaryItem(text, at, summarySpeaker(rec, text, at, point?.speakerId))
             }
         SummarySection(title, items, withSpeaker = header == "Задачи").takeIf { items.isNotEmpty() }
     }
     return sections.ifEmpty { null }
 }
+
+/** Если голос уже объединили до прихода конспекта, ищем его в актуальных репликах. */
+private fun summarySpeaker(rec: Recording, text: String, at: Long?, speakerId: String?): String? =
+    speakerId?.takeIf { rec.speaker(it) != null } ?: at?.let { t ->
+        rec.utterances.firstOrNull { it.startMs == t && it.text.contains(text) }?.speakerId
+            ?: rec.utterances.firstOrNull { t in it.startMs..it.endMs && it.text.contains(text) }?.speakerId
+            ?: rec.utterances.firstOrNull { t in it.startMs..it.endMs }?.speakerId
+    }
 
 /** Конспект обычным текстом: чтобы скопировать или отправить в мессенджер. */
 fun summaryText(rec: Recording): String? {

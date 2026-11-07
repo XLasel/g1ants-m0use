@@ -76,5 +76,8 @@ fun Recording.mergeSpeaker(from: String, into: String): Recording {
             joined += u
         }
     }
-    return copy(utterances = joined, speakers = speakers.filter { it.id != from })
+    val updatedSummary = summary?.copy(points = summary.points.map {
+        if (it.speakerId == from) it.copy(speakerId = into) else it
+    })
+    return copy(utterances = joined, speakers = speakers.filter { it.id != from }, summary = updatedSummary)
 }
