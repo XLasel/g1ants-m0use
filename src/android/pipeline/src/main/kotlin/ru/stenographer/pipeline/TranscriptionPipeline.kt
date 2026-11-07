@@ -9,6 +9,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import ru.stenographer.core.PipelineEvent
 import ru.stenographer.core.PipelineEvent.Decoded
@@ -76,7 +78,7 @@ class TranscriptionPipeline(context: Context, private val config: PipelineConfig
 
             // 2. Диаризация: голоса и отрезки отдаются после каждого куска 27 с
             progress.start(Stage.DIARIZE)
-            val diarizerDir = NemotronInstaller(context).install()
+            val diarizerDir = installLock.withLock { NemotronInstaller(context).install() }
             val diarization = withContext(Dispatchers.Default) {
                 NemotronDiarizer.open(diarizerDir, config.threads).use { diarizer ->
                     diarizer.diarizeWithSegments(audio, onProgress = { p, _ -> progress.report(Stage.DIARIZE, p) }) { update ->
@@ -92,7 +94,7 @@ class TranscriptionPipeline(context: Context, private val config: PipelineConfig
             // 3. Распознавание по кускам речи из диаризации; Nemotron уже закрыт
             progress.start(Stage.RECOGNIZE)
             val chunks = ChunkPlanner.plan(diarization.probs, audio)
-            val asrDir = ModelInstaller(context).install()
+            val asrDir = installLock.withLock { ModelInstaller(context).install() }
             val words = SherpaRecognizer.open(asrDir, config.threads).use { asr ->
                 asr.transcribe(
                     audio,
@@ -120,6 +122,18 @@ class TranscriptionPipeline(context: Context, private val config: PipelineConfig
             send(Failed(fileId, reasonOf(e)))
         }
     }.buffer(Channel.UNLIMITED) // события из колбэков моделей не теряются, даже если интерфейс занят
+
+    /**
+     * Заранее копирует модели из APK во внутреннюю память. Приложение зовёт это при первом открытии,
+     * пока человек выбирает файлы: тогда первая обработка не ждёт копирования около 330 МБ.
+     * Безопасно вызывать вместе с [process]: копирование идёт под общим замком и не повторяется.
+     */
+    suspend fun prepareModels() {
+        installLock.withLock {
+            NemotronInstaller(context).install()
+            ModelInstaller(context).install()
+        }
+    }
 
     /** То же для файла, например записи из приложения. */
     fun process(fileId: String, file: File): Flow<PipelineEvent> = process(fileId, Uri.fromFile(file))
@@ -155,5 +169,8 @@ class TranscriptionPipeline(context: Context, private val config: PipelineConfig
 
     private companion object {
         const val TAG = "TranscriptionPipeline"
+
+        /** Один замок на процесс: два одновременных копирования одной модели испортили бы файлы. */
+        val installLock = Mutex()
     }
 }
