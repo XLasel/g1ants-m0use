@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class SummaryWorkerTest {
     private val source = listOf(SourceUtterance("speaker_1", 1000, 2000, "Обсудим сборку проекта."))
-    private val answer = """{"title":"Обсуждение сборки нашего проекта","topic":{"text":"Сборка проекта","source_id":0},"decisions":[],"tasks":[]}"""
+    private val answer = """{"title":"Обсуждение сборки нашего проекта","topic":{"source_id":0},"decisions":[],"tasks":[]}"""
 
     private class Generator(val action: () -> String) : TextGenerator {
         override val contextSize = 4096

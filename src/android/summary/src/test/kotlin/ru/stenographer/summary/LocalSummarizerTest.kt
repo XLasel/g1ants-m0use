@@ -25,7 +25,7 @@ class LocalSummarizerTest {
     }
 
     private fun answer(id: Int = 1, title: String = "Проверка сборки к пятнице") =
-        """{"title":"$title","topic":{"text":"Выпуск проекта","source_id":0},"decisions":[],"tasks":[{"text":"Проверить сборку к пятнице","source_id":$id}]}"""
+        """{"title":"$title","topic":{"source_id":0},"decisions":[],"tasks":[{"source_id":$id}]}"""
 
     private fun expectFailure(response: String) {
         val engine = Engine { response }
@@ -37,7 +37,7 @@ class LocalSummarizerTest {
         val result = LocalSummarizer(engine).summarize(input)
         assertEquals("Проверка сборки к пятнице", result.title)
         assertEquals(listOf(1250L, 8000L), result.points.map { it.sourceStartMs })
-        assertTrue(result.text.contains("Задачи\n• Проверить сборку к пятнице"))
+        assertTrue(result.text.contains("Задачи\n• Я проверю сборку к пятнице."))
         assertEquals(1, engine.requests.size)
     }
 
@@ -58,12 +58,21 @@ class LocalSummarizerTest {
     }
 
     @Test fun inventedSourceIdsAreRejected() { expectFailure(answer(id = 500)) }
+    @Test fun modelCannotReplaceSourceText() {
+        expectFailure(answer().replace("\"source_id\":1", "\"source_id\":1,\"text\":\"Выдуманный срок\""))
+    }
+    @Test fun identicalTextFromDifferentTurnsKeepsItsOwnTime() {
+        val sameText = input.map { it.copy(text = "Проверим сборку.") }
+        val result = LocalSummarizer(Engine { answer() }).summarize(sameText)
+        assertEquals(listOf(1250L, 8000L), result.points.map { it.sourceStartMs })
+        assertTrue(result.points.all { it.text == "Проверим сборку." })
+    }
     @Test fun fractionalSourceIdIsRejected() { expectFailure(answer().replace("\"source_id\":1", "\"source_id\":1.0")) }
     @Test fun generatedTimestampsAreRejected() { expectFailure(answer().replace("\"source_id\":1", "\"source_id\":1,\"sourceStartMs\":999999")) }
     @Test fun trailingTextIsRejected() { expectFailure(answer() + " explanation") }
     @Test fun truncatedJsonIsRejected() { expectFailure(answer().dropLast(1)) }
     @Test fun absentDecisionsAndTasksAreNotInvented() {
-        val response = """{"title":"Обсуждение выпуска нового проекта","topic":{"text":"Выпуск проекта","source_id":0},"decisions":[],"tasks":[]}"""
+        val response = """{"title":"Обсуждение выпуска нового проекта","topic":{"source_id":0},"decisions":[],"tasks":[]}"""
         val result = LocalSummarizer(Engine { response }).summarize(input)
         assertEquals(1, result.points.size)
         assertTrue(result.text.endsWith("Задачи\n—"))
@@ -105,7 +114,7 @@ class LocalSummarizerTest {
         val engine = Engine(contextSize = 900, tokenCount = { 200 + it.length / 2 }) { request ->
             val rows = JSONObject(request.user).getJSONArray("source_fragments")
             val id = rows.getJSONObject(0).getInt("source_id")
-            """{"title":"Обсуждение выпуска нового проекта","topic":{"text":"Краткая тема","source_id":$id},"decisions":[],"tasks":[]}"""
+            """{"title":"Обсуждение выпуска нового проекта","topic":{"source_id":$id},"decisions":[],"tasks":[]}"""
         }
         val longInput = (0 until 5).map { id -> SourceUtterance("speaker_1", id * 1000L, id * 1000L + 900, "Содержательная реплика о проекте. ".repeat(8)) }
         val progress = mutableListOf<Float>()
@@ -121,7 +130,8 @@ class LocalSummarizerTest {
         val engine = Engine(contextSize = 900, tokenCount = { 200 + it.length / 2 }) { request ->
             val rows = JSONObject(request.user).getJSONArray("source_fragments")
             for (i in 0 until rows.length()) seen += rows.getJSONObject(i).getString("text")
-            """{"title":"Обсуждение выпуска нового проекта","topic":{"text":"Краткая тема","source_id":0},"decisions":[],"tasks":[]}"""
+            val id = rows.getJSONObject(0).getInt("source_id")
+            """{"title":"Обсуждение выпуска нового проекта","topic":{"source_id":$id},"decisions":[],"tasks":[]}"""
         }
         val text = "Начало " + "проект ".repeat(500) + "Конец"
         LocalSummarizer(engine, maxOutputTokens = 128).summarize(listOf(input[0].copy(text = text)))
@@ -132,7 +142,7 @@ class LocalSummarizerTest {
     @Test fun generationBudgetDoesNotSilentlyReturnPartialSummary() {
         val engine = Engine(contextSize = 900, tokenCount = { 200 + it.length / 2 }) { request ->
             val id = JSONObject(request.user).getJSONArray("source_fragments").getJSONObject(0).getInt("source_id")
-            """{"title":"Обсуждение выпуска нового проекта","topic":{"text":"Краткая тема","source_id":$id},"decisions":[],"tasks":[]}"""
+            """{"title":"Обсуждение выпуска нового проекта","topic":{"source_id":$id},"decisions":[],"tasks":[]}"""
         }
         val text = "Начало " + "проект ".repeat(500) + "Конец"
         assertThrows(SummaryException::class.java) {

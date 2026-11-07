@@ -2,6 +2,7 @@
 #include "llama.h"
 #include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -123,7 +124,13 @@ std::string generate(Model & state, const std::vector<llama_token> & tokens, con
 extern "C" JNIEXPORT jlong JNICALL Java_ru_stenographer_summary_android_NativeLlama_open(JNIEnv * env, jobject, jbyteArray path, jint context, jint threads) {
     try {
         if (context < 1024 || context > 32768 || threads < 1 || threads > 16) throw std::runtime_error("Invalid LLM configuration");
-        std::call_once(backend, [] { llama_backend_init(); });
+        std::call_once(backend, [] {
+            // Keep errors, avoid thousands of tokenizer/graph debug lines on a phone.
+            llama_log_set([](ggml_log_level level, const char * message, void *) {
+                if (level == GGML_LOG_LEVEL_WARN || level == GGML_LOG_LEVEL_ERROR) std::fputs(message, stderr);
+            }, nullptr);
+            llama_backend_init();
+        });
         auto state = std::make_shared<Model>();
         auto model_params = llama_model_default_params();
         model_params.n_gpu_layers = 0;
