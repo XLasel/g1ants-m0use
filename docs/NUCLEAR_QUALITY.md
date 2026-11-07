@@ -16,25 +16,38 @@ python tools/nuclear_quality.py score --reference reference.txt --hypothesis exp
 Эталон — вручную проверенный UTF-8 TXT или JSON в том же формате, что экспорт.
 Без эталона можно проверить формат и время, но нельзя получить WER.
 
-## Текущий benchmark Антона (роль 2)
+## Android benchmark
 
-В ветке `task-2-speech-recognition` экран `speechbench` сохраняет массив `words`,
-длительности и параметры телефона. Это ещё не итоговый экспорт с говорящими.
+Экран `speechbench` сохраняет массив `words`, длительности и параметры телефона.
+Это диагностический отчёт, отдельный от итогового экспорта с говорящими.
 Его можно проверить напрямую, без ручного превращения слов в реплики:
 
 ```bash
 python tools/nuclear_quality.py score-bench --reference reference.txt --benchmark bench_test_2.m4a.4.json --output reports/test_2_asr.json
 ```
 
-Сохранённый файл телефона соответствует `MainActivity.kt` из коммита `1dc8c38`:
-`audio_seconds`, `processing_ms`, `words[{text,start_ms,end_ms}]`, `device`, `threads`,
-`peak_rss_mb`. RTF пересчитывается как `processing_ms / 1000 / audio_seconds`;
-расхождение с полем `rtf` или суммой `decode + load + asr` видно в предупреждениях.
-Скрипт не выдумывает speaker-ID для такого файла.
+Общие поля: `audio_seconds`, `processing_ms`, `words[{text,start_ms,end_ms}]`,
+`device`, `threads`, `peak_rss_mb`. Поддерживаются два варианта:
 
-Время этого benchmark охватывает декодирование, загрузку ASR и ASR.
-Диаризация, LLM, копирование модели, огибающая и запись JSON в него не входят.
-Такой RTF нельзя представлять как результат полной цепочки приложения.
+| Формат | Расчёт `rtf` | Расчёт `full_rtf` |
+|---|---|---|
+| Старый ASR (коммит `1dc8c38`), без `transcription_ms` | `processing_ms / 1000 / audio_seconds` | `null`, полная цепочка не измерена |
+| Текущий pipeline, есть `transcription_ms` | `transcription_ms / 1000 / audio_seconds` | `processing_ms / 1000 / audio_seconds` |
+
+В текущем pipeline первый показатель останавливается на `Done`, второй — после
+завершения Flow, включая попытку LLM-конспекта. В новом бенче поле
+`processing_scope=until_flow_completion_before_export` подтверждает, что экспорт
+время не включает. Старые pipeline-отчёты могли включать экспорт в `processing_ms`;
+это явно отмечается в `full_timing_scope`. Статус конспекта сохраняется в `summary_status`: полный RTF
+сам по себе не доказывает, что LLM отработала успешно. `transcription_ms` должен
+быть целым, неотрицательным и не больше `processing_ms`.
+
+Старый замер охватывал декодирование, загрузку ASR и ASR; диаризация и LLM в него
+не входили. Для него сохраняется проверка суммы `decode + load + asr`.
+Несогласованный `rtf` пересчитывается с предупреждением. Отчёт с полем `failed`
+или `success=false` отклоняется, чтобы не оценивать частично полученные слова
+как завершённый прогон. Ошибка только конспекта не отменяет WER транскрипции.
+Голоса по массиву `words` не оцениваются и не выдумываются.
 
 Эталон должен быть размечен вручную или проверен вручную. Сравнение с другой
 автоматической расшифровкой показывает расхождение версий, а не точность относительно

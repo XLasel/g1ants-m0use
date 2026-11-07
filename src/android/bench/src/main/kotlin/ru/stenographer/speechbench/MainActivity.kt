@@ -148,6 +148,9 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Фиксируем конец Flow до экспорта и вывода результата, чтобы граница замера была однозначной.
+        val processingMs = SystemClock.elapsedRealtime() - started
+        report.put("processing_scope", "until_flow_completion_before_export")
         val safeName = name.replace(Regex("[^\\w.-]"), "_")
         failure?.let {
             report.put("failed", it)
@@ -168,7 +171,10 @@ class MainActivity : ComponentActivity() {
         })
         summary?.let { s ->
             val result = JSONObject().put("title", s.title).put("text", s.text)
-                .put("points", JSONArray(s.points.map { JSONObject().put("text", it.text).put("source_start_ms", it.sourceStartMs) }))
+                .put("points", JSONArray(s.points.map {
+                    JSONObject().put("text", it.text).put("source_start_ms", it.sourceStartMs)
+                        .put("kind", it.kind).put("speaker_id", it.speakerId)
+                }))
             val summaryFile = File(getExternalFilesDir(null), "summary_$safeName.json")
             summaryFile.writeText(result.toString(2))
             report.put("summary_file", summaryFile.path)
@@ -177,7 +183,6 @@ class MainActivity : ComponentActivity() {
 
         // Время до Done — расшифровка целиком, с установкой и загрузкой моделей; processing_ms — вместе с конспектом.
         val seconds = durationMs / 1000.0
-        val processingMs = SystemClock.elapsedRealtime() - started
         val transcriptionMs = if (doneAtMs >= 0) doneAtMs else processingMs
         val rtf = if (seconds > 0) transcriptionMs / 1000.0 / seconds else 0.0
         report.put("audio_seconds", seconds).put("timings_ms", timings).put("peak_rss_mb", peaks)

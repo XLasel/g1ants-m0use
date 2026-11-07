@@ -8,7 +8,13 @@ import java.util.concurrent.CancellationException
 
 /** Копия значений готовой реплики, без зависимости от UI, ASR или диаризатора. */
 data class SourceUtterance(val speakerId: String, val startMs: Long, val endMs: Long, val text: String)
-data class SummaryPoint(val text: String, val sourceStartMs: Long)
+/** Раздел выбирает LLM, а текст, время и голос всегда берутся из исходной реплики. */
+data class SummaryPoint(
+    val text: String,
+    val sourceStartMs: Long,
+    val kind: String = "topic",
+    val speakerId: String? = null,
+)
 data class SummaryResult(val title: String, val text: String, val points: List<SummaryPoint>)
 
 data class GenerationRequest(val system: String, val user: String, val maxTokens: Int, val grammar: String)
@@ -160,10 +166,6 @@ class LocalSummarizer(
                 throw SummaryException("Unexpected summary fields")
             }
             val titleValue = root.get("title") as? String ?: throw SummaryException("Title must be text")
-            val title = titleValue.trim { it.isWhitespace() || it in "\"'«»“”.!?…" }
-            if (title.length > 160 || title.split(Regex("\\s+")).size !in 3..6 || title.contains('\n')) {
-                throw SummaryException("Title must contain 3 to 6 words")
-            }
             fun item(value: Any): Evidence {
                 val obj = value as? JSONObject ?: throw SummaryException("Summary item must be an object")
                 if (obj.keys().asSequence().toSet() != setOf("source_id")) throw SummaryException("Only a source_id is allowed in an item")
@@ -179,11 +181,16 @@ class LocalSummarizer(
                 return (0 until array.length()).map { item(array.get(it)) }.distinct()
             }
             val topic = if (root.isNull("topic")) null else item(root.get("topic"))
-            val draft = Draft(title, topic, items("decisions"), items("tasks"))
-            if (topic == null && draft.decisions.isEmpty() && draft.tasks.isEmpty()) {
+            val decisions = items("decisions")
+            val tasks = items("tasks")
+            if (topic == null && decisions.isEmpty() && tasks.isEmpty()) {
                 throw SummaryException("Summary has no source-linked content")
             }
-            return draft
+            // Ошибка оформления названия не должна уничтожать проверенные пункты конспекта.
+            val title = normalizedTitle(titleValue)
+                ?: (listOfNotNull(topic) + decisions + tasks).firstNotNullOfOrNull { normalizedTitle(it.text) }
+                ?: "Краткий конспект разговора"
+            return Draft(title, topic, decisions, tasks)
         } catch (e: SummaryException) {
             throw e
         } catch (e: Exception) {
@@ -191,9 +198,21 @@ class LocalSummarizer(
         }
     }
 
+    private fun normalizedTitle(value: String): String? {
+        val words = value.trim { it.isWhitespace() || it in "\"'«»“”.!?…" }
+            .split(Regex("[\\s\\p{Z}]+"))
+            .filter { word -> word.any { it.isLetterOrDigit() } }
+            .take(6)
+        val title = words.joinToString(" ").trimEnd { it in "\"'«»“”.!?…" }
+        return title.takeIf { words.size in 3..6 && it.length <= 160 }
+    }
+
     private fun render(draft: Draft, source: List<SourceUtterance>): SummaryResult {
-        val points = (listOfNotNull(draft.topic) + draft.decisions + draft.tasks)
-            .map { SummaryPoint(it.text, source[it.sourceIndex].startMs) }.distinct()
+        fun points(kind: String, items: List<Evidence>) = items.map {
+            SummaryPoint(it.text, source[it.sourceIndex].startMs, kind, it.speakerId)
+        }
+        val points = (points("topic", listOfNotNull(draft.topic)) +
+            points("decision", draft.decisions) + points("task", draft.tasks)).distinct()
         fun section(name: String, items: List<Evidence>): String = name + "\n" +
             if (items.isEmpty()) "—" else items.joinToString("\n") { "• ${it.text}" }
         val text = listOf(

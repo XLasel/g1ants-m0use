@@ -245,19 +245,21 @@ def score_files(
 
 
 def score_benchmark(reference: Path, benchmark: Path, normalization: str = "ru-basic") -> dict[str, Any]:
-    """Read the existing Android speechbench format without fabricating speakers.
-
-    Matches MainActivity.kt at task-2-speech-recognition/1dc8c38. Its
-    processing_ms is decode + load + ASR, not a full diarization/LLM run.
-    """
+    """Читает старый ASR-бенч и новый pipeline-бенч, разделяя границы замера."""
     data = read_json(benchmark)
     if not isinstance(data, dict) or not isinstance(data.get("words"), list):
         raise InputError("Android benchmark must be an object containing a words array.")
+    if "failed" in data or data.get("success") is False:
+        raise InputError("Benchmark processing failed; partial words are not a completed-run score.")
     duration, processing_ms = data.get("audio_seconds"), data.get("processing_ms")
     if type(duration) not in (int, float) or not math.isfinite(duration) or duration <= 0:
         raise InputError("Benchmark audio_seconds must be a finite positive number.")
     if type(processing_ms) is not int or processing_ms < 0:
         raise InputError("Benchmark processing_ms must be a non-negative integer.")
+    pipeline_format = "transcription_ms" in data
+    transcription_ms = data.get("transcription_ms", processing_ms)
+    if type(transcription_ms) is not int or not 0 <= transcription_ms <= processing_ms:
+        raise InputError("Benchmark transcription_ms must be an integer between zero and processing_ms.")
     warnings: list[str] = []
     text: list[str] = []
     previous_start: int | None = None
@@ -278,7 +280,7 @@ def score_benchmark(reference: Path, benchmark: Path, normalization: str = "ru-b
         text.append(word["text"])
     reference_text, reference_warnings = _reference_text(reference, duration)
     counts = edit_counts(words(reference_text, normalization), words(" ".join(text), normalization))
-    elapsed = processing_ms / 1000.0
+    elapsed = transcription_ms / 1000.0
     rtf = elapsed / duration
     reported_rtf = data.get("rtf")
     if reported_rtf is not None and (
@@ -286,16 +288,19 @@ def score_benchmark(reference: Path, benchmark: Path, normalization: str = "ru-b
         or not math.isfinite(reported_rtf)
         or not math.isclose(reported_rtf, rtf, rel_tol=1e-6, abs_tol=1e-6)
     ):
-        warnings.append("Recorded rtf differs from processing_ms / audio_seconds; using recomputed RTF.")
+        timing_field = "transcription_ms" if pipeline_format else "processing_ms"
+        warnings.append(f"Recorded rtf differs from {timing_field} / audio_seconds; using recomputed RTF.")
     stages = data.get("timings_ms")
-    if isinstance(stages, dict) and all(type(stages.get(key)) is int and stages[key] >= 0 for key in ("decode", "load", "asr")):
+    if not pipeline_format and isinstance(stages, dict) and all(type(stages.get(key)) is int and stages[key] >= 0 for key in ("decode", "load", "asr")):
         if sum(stages[key] for key in ("decode", "load", "asr")) != processing_ms:
             warnings.append("processing_ms differs from decode + load + asr; check benchmark timing scope.")
     notes = [
         "Local diagnostic; the reference must be manually checked before interpreting this as ASR accuracy.",
-        "This is the role-2 speechbench format, not the required transcript export; it has no speaker labels.",
+        "WER uses the words array, not the required transcript export; speaker attribution is not scored.",
         "Timing was read from the benchmark file, not independently measured by this tool.",
-        "Current Android benchmark timing excludes diarization, LLM, model installation, envelope and JSON export.",
+        ("RTF stops at Done; full_rtf uses processing_ms including any summary attempt; see full_timing_scope for export inclusion."
+         if pipeline_format else
+         "Legacy role-2 timing excludes diarization, LLM, model installation, envelope and JSON export."),
         "WER normalization and the final RTF timing scope must be confirmed with the organizers.",
     ]
     if not counts["reference_words"]:
@@ -303,14 +308,22 @@ def score_benchmark(reference: Path, benchmark: Path, normalization: str = "ru-b
     return {
         "reference": str(reference),
         "hypothesis": str(benchmark),
-        "input_format": "android_speechbench_words",
+        "input_format": "android_pipeline_words" if pipeline_format else "android_speechbench_words",
         "normalization": normalization,
         **counts,
         "audio_seconds": duration,
         "elapsed_seconds": elapsed,
         "rtf": rtf,
         "timing_source": "benchmark_file",
-        "timing_scope": "decode+load+asr (role-2 benchmark)",
+        "timing_scope": "decode+diarize+recognize+merge until Done" if pipeline_format else "decode+load+asr (role-2 benchmark)",
+        "full_elapsed_seconds": processing_ms / 1000.0 if pipeline_format else None,
+        "full_rtf": processing_ms / 1000.0 / duration if pipeline_format else None,
+        "full_timing_scope": (
+            "until pipeline flow completion before export, including any summary attempt"
+            if data.get("processing_scope") == "until_flow_completion_before_export"
+            else "producer-defined processing_ms; older pipeline reports may include export"
+        ) if pipeline_format else None,
+        "summary_status": data.get("summary_status") if pipeline_format else None,
         "device": data.get("device"),
         "threads": data.get("threads"),
         "peak_rss_mb": data.get("peak_rss_mb"),
@@ -355,7 +368,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     score.add_argument("--device")
     score.add_argument("--timing-scope")
     score.add_argument("--output", type=Path)
-    bench = commands.add_parser("score-bench", help="Score the existing Android role-2 benchmark words JSON.")
+    bench = commands.add_parser("score-bench", help="Score Android ASR/pipeline benchmark JSON; separate transcript and full RTF.")
     bench.add_argument("--reference", type=Path, required=True)
     bench.add_argument("--benchmark", type=Path, required=True)
     bench.add_argument("--normalization", choices=("ru-basic", "exact"), default="ru-basic")

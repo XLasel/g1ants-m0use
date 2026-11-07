@@ -1,3 +1,2 @@
-test_id,timestamp_utc,commit,file_name,file_size_bytes,duration_seconds,distance_meters,noise_condition,noise_level_db,attempt,success,checksum_match,device_tx,device_rx,notes
-example-001,2026-01-01T00:00:00Z,replace-me,sample.txt,128,1.23,1.0,quiet-room,35,1,true,true,replace-me,replace-me,DELETE THIS EXAMPLE ROW
-
+file,duration_seconds,elapsed_seconds,rtf,wer_percent,speaker_count,device,build,timing_scope,summary_status,source,notes
+test_2.m4a,200.5,36.4,0.18154613466334163,,3,Pixel 7 Pro / Android 17 / 12 GB,debug bench,decode+diarize+recognize+merge,not_measured,docs/TEST_RESULTS.md / team measurement,Historical teammate measurement; includes no LLM result; WER and exact build SHA unavailable; not a final release benchmark
