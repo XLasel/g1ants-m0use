@@ -1,0 +1,40 @@
+{
+  "model_file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+  "summary": {
+    "text": "Тема\n\u2022 Обсуждаем подготовку приложения к защите на хакатоне.\n\nРешения\n\u2014\n\nЗадачи\n\u2014",
+    "title": "Обсуждение подготовки приложения к защите на",
+    "points": [{
+      "source_start_ms": 0,
+      "kind": "topic",
+      "speaker_id": "speaker_1",
+      "text": "Обсуждаем подготовку приложения к защите на хакатоне."
+    }]
+  },
+  "utterances": 5,
+  "context_size": 4096,
+  "model_closed": true,
+  "os": "Linux",
+  "point_text_is_source_excerpt": true,
+  "kind": "summary_host_inference",
+  "threads": 4,
+  "cpu": "AMD EPYC 9V74 80-Core Processor",
+  "input_kind": "transcript_not_audio",
+  "validation_scope": "JSON, source excerpts, timestamps and lifecycle; not a semantic quality score",
+  "point_speaker_is_source_speaker": true,
+  "load_ms": 763,
+  "model_bytes": 1117320736,
+  "model_sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+  "java": "17.0.20",
+  "peak_rss_mb": 1921,
+  "calls": [{
+    "raw_json": "{\"title\":\"Обсуждение подготовки приложения к защите на хакатоне\",\"topic\":{\"source_id\":0},\"decisions\":[],\"tasks\":[]}",
+    "prompt_tokens": 457,
+    "generation_ms": 5737,
+    "output_chars": 115
+  }],
+  "success": true,
+  "total_ms": 6624,
+  "transcript_unchanged": true,
+  "arch": "amd64",
+  "transcript_sha256": "71d0ab0294ac22dc9640f71791c8204f264cf78d638fe46cd2a72fdce8ffc016"
+}
