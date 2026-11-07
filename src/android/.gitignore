@@ -9,5 +9,5 @@ speech/src/main/assets/models/
 .kotlin/
 # Модель диаризации: её кладёт scripts/prepare_diarization.sh
 pipeline/src/main/assets/models/nemotron/
-# Модель конспекта (GGUF, около 1 ГБ): кладётся в assets перед сборкой APK, в git не нужна
+# Модель конспекта: её кладёт scripts/prepare_summary.sh
 pipeline/src/main/assets/models/summary/

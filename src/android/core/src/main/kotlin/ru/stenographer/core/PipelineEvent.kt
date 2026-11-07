@@ -28,7 +28,11 @@ sealed interface PipelineEvent {
     /** Порция отрезков голосов. Последняя порция — с [final] = true. */
     data class Segments(override val fileId: String, val segments: List<Segment>, val final: Boolean) : PipelineEvent
 
-    /** Характеристики голоса для узора (по желанию, пока не отдаётся). */
+    /**
+     * Характеристики голоса для узора, приходят сразу после диаризации, по одному на голос.
+     * [pitchMedianHz] — медиана тона (мужские ~85–155 Гц, женские ~165–255), [pitchSpread] — интонация от 0 до 1
+     * (размах тона, октава = 1), [loudnessMean] — средняя громкость голоса от 0 до 1 относительно всей записи.
+     */
     data class SpeakerFeatures(
         override val fileId: String,
         val speakerId: String,
