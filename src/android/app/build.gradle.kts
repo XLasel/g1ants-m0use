@@ -13,6 +13,14 @@ android {
         versionName = "0.1"
         ndk { abiFilters += "arm64-v8a" }
     }
+    buildTypes {
+        release {
+            // Debug-ключ подходит только для замеров. Для сдачи нужен отдельный ключ команды вне git.
+            signingConfig = signingConfigs.getByName("debug")
+            // R8 выключен: он может удалить классы, которые вызываются только из нативного кода.
+            isMinifyEnabled = false
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
