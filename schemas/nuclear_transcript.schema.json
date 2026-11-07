@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nuclear IT Hack 2026 transcript export",
+  "description": "Required fields and types from official slide 15. Additional fields are not explicitly prohibited. Temporal consistency is checked by the Python validator.",
+  "type": "object",
+  "required": ["transcript"],
+  "properties": {
+    "transcript": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["speaker_id", "start_ms", "end_ms", "text"],
+        "properties": {
+          "speaker_id": {"type": "string"},
+          "start_ms": {"type": "integer"},
+          "end_ms": {"type": "integer"},
+          "text": {"type": "string"}
+        }
+      }
+    }
+  }
+}
