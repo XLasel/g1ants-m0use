@@ -36,6 +36,8 @@ android {
 dependencies {
     // Вся обработка и модели приходят через :pipeline, бенч только меряет её события
     implementation(project(":pipeline"))
+    // Только для режима verify: сравнить чтение файла одним проходом и параллельно, см. android/README.md
+    implementation(project(":speech"))
     implementation("androidx.activity:activity-ktx:1.13.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
 }

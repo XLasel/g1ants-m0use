@@ -23,6 +23,7 @@ import ru.stenographer.core.Utterance
 import ru.stenographer.core.Word
 import ru.stenographer.pipeline.PipelineConfig
 import ru.stenographer.pipeline.TranscriptionPipeline
+import ru.stenographer.speech.MediaCodecAudioDecoder
 import java.io.File
 
 /**
@@ -38,7 +39,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var pick: Button
 
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) start(uri, uri.lastPathSegment.orEmpty().substringAfterLast('/'), DEFAULT_THREADS)
+        if (uri != null) start(uri, uri.lastPathSegment.orEmpty().substringAfterLast('/'), DEFAULT_THREADS, DEFAULT_PARTS, false)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,16 +62,21 @@ class MainActivity : ComponentActivity() {
         val file = intent.getStringExtra(EXTRA_FILE)
         if (savedInstanceState == null && file != null) {
             val path = File(getExternalFilesDir(null), file)
-            start(Uri.fromFile(path), file, intent.getIntExtra(EXTRA_THREADS, DEFAULT_THREADS))
+            start(
+                Uri.fromFile(path), file,
+                threads = intent.getIntExtra(EXTRA_THREADS, DEFAULT_THREADS),
+                parts = intent.getIntExtra(EXTRA_PARTS, DEFAULT_PARTS),
+                verify = intent.getBooleanExtra(EXTRA_VERIFY, false),
+            )
         }
     }
 
-    private fun start(uri: Uri, name: String, threads: Int) {
+    private fun start(uri: Uri, name: String, threads: Int, parts: Int, verify: Boolean) {
         pick.isEnabled = false
         output.text = ""
         lifecycleScope.launch {
             try {
-                bench(uri, name, threads, intent.getStringExtra(EXTRA_SUMMARY_MODEL))
+                if (verify) verifyDecode(uri, name, parts) else bench(uri, name, threads, intent.getStringExtra(EXTRA_SUMMARY_MODEL))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -196,6 +202,50 @@ class MainActivity : ComponentActivity() {
         Log.i(TAG, "DONE file=$name threads=$threads seconds=$seconds words=${words.size} rtf=$rtf peakMb=${peakRssMb()} json=${file.path}")
     }
 
+    /**
+     * Читает файл одним проходом и параллельно и сравнивает по отсчётам. Распознавание не запускается.
+     * Нужно, чтобы проверить стыки на настоящих кодеках телефона.
+     */
+    private suspend fun verifyDecode(uri: Uri, name: String, parts: Int) {
+        suspend fun timed(decoder: MediaCodecAudioDecoder): Pair<FloatArray, Long> {
+            val started = SystemClock.elapsedRealtime()
+            val audio = decoder.decode(uri)
+            return audio to SystemClock.elapsedRealtime() - started
+        }
+        val parallelDecoder = MediaCodecAudioDecoder(this, parts)
+        val (single, singleMs) = timed(MediaCodecAudioDecoder(this, 1))
+        val (parallel, parallelMs) = timed(parallelDecoder)
+        val common = minOf(single.size, parallel.size)
+        var maxDiff = 0f
+        var firstMismatch = -1
+        var mismatches = 0
+        for (i in 0 until common) {
+            val diff = kotlin.math.abs(single[i] - parallel[i])
+            if (diff > maxDiff) maxDiff = diff
+            if (diff > MISMATCH) {
+                mismatches++
+                if (firstMismatch < 0) firstMismatch = i
+            }
+        }
+        val report = JSONObject().put("file", name).put("parts", parallelDecoder.lastParts)
+            .put("single_ms", singleMs).put("parallel_ms", parallelMs)
+            .put("single_samples", single.size).put("parallel_samples", parallel.size)
+            .put("notes", JSONArray(parallelDecoder.lastNotes))
+            .put("max_diff", maxDiff.toDouble()).put("mismatches", mismatches).put("first_mismatch_ms", if (firstMismatch < 0) -1 else firstMismatch / 16)
+        val safeName = name.replace(Regex("[^\\w.-]"), "_")
+        File(getExternalFilesDir(null), "verify_$safeName.$parts.json").writeText(report.toString(2))
+        if (intent.getBooleanExtra(EXTRA_DUMP, false)) {
+            // Сырые отсчёты обоих вариантов для разбора стыков на компьютере: float32, little-endian.
+            for ((suffix, data) in listOf("single" to single, "parallel" to parallel)) {
+                val bytes = java.nio.ByteBuffer.allocate(data.size * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                bytes.asFloatBuffer().put(data)
+                File(getExternalFilesDir(null), "dump_$safeName.$suffix.f32").writeBytes(bytes.array())
+            }
+        }
+        say(report.toString(2))
+        Log.i(TAG, "DONE verify $report")
+    }
+
     private fun say(line: String) {
         output.append(line + "\n")
         Log.i(TAG, line.take(300))
@@ -211,6 +261,11 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_FILE = "file"
         const val EXTRA_THREADS = "threads"
         const val EXTRA_SUMMARY_MODEL = "summary_model"
+        const val EXTRA_PARTS = "parts"
+        const val EXTRA_VERIFY = "verify"
+        const val EXTRA_DUMP = "dump"
         const val DEFAULT_THREADS = 4
+        const val DEFAULT_PARTS = 4
+        const val MISMATCH = 1e-5f
     }
 }

@@ -8,14 +8,26 @@ import kotlin.math.sin
 
 /** Сводит чередующиеся каналы в моно средним значением. */
 internal fun downmix(interleaved: FloatArray, count: Int, channels: Int): FloatArray {
+    val out = FloatArray(count / channels.coerceAtLeast(1))
+    downmixInto(interleaved, count, channels, out)
+    return out
+}
+
+/** То же, что [downmix], но пишет в готовый массив и возвращает число отсчётов. Можно передать один и тот же массив. */
+internal fun downmixInto(interleaved: FloatArray, count: Int, channels: Int, out: FloatArray): Int {
     require(channels > 0) { "Число каналов должно быть больше нуля" }
-    if (channels == 1) return interleaved.copyOf(count)
     val frames = count / channels
-    return FloatArray(frames) { frame ->
-        var sum = 0f
-        for (channel in 0 until channels) sum += interleaved[frame * channels + channel]
-        sum / channels
+    if (channels == 1) {
+        if (out !== interleaved) interleaved.copyInto(out, 0, 0, frames)
+        return frames
     }
+    for (frame in 0 until frames) {
+        var sum = 0f
+        val base = frame * channels
+        for (channel in 0 until channels) sum += interleaved[base + channel]
+        out[frame] = sum / channels
+    }
+    return frames
 }
 
 /** Растущий буфер, чтобы не копировать звук при каждом добавлении блока. */
