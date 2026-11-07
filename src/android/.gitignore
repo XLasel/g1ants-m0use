@@ -6,3 +6,4 @@ local.properties
 # Большие файлы: их кладёт scripts/prepare_speech.sh
 speech/libs/*.aar
 speech/src/main/assets/models/
+.kotlin/
