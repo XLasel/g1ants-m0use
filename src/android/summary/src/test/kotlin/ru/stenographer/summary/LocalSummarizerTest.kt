@@ -68,6 +68,20 @@ class LocalSummarizerTest {
         }
     }
 
+    @Test fun titleCopiedFromPromptUsesSourceTopic() {
+        // Так ответила Qwen2.5-0.5B на Pixel 7 Pro: в название попал кусок инструкции
+        for (title in listOf("3-6 слов на языке записи", "Название записи в несколько слов", "без кавычек и точки в конце")) {
+            val result = LocalSummarizer(Engine { answer(title = title) }).summarize(input)
+            assertEquals(title, "Обсудим выпуск проекта", result.title)
+            assertEquals(2, result.points.size)
+        }
+    }
+
+    @Test fun ordinaryTitleWithCommonWordsIsKept() {
+        val result = LocalSummarizer(Engine { answer(title = "Решения по выпуску на языке Kotlin") }).summarize(input)
+        assertEquals("Решения по выпуску на языке Kotlin", result.title)
+    }
+
     @Test fun titleWhitespaceIsNormalized() {
         val raw = JSONObject(answer()).put("title", "  Проверка\n сборки\tк\u00a0пятнице. ").toString()
         val result = LocalSummarizer(Engine { raw }).summarize(input)
