@@ -5,6 +5,9 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+    plugins {
+        kotlin("jvm") version "2.2.20"
+    }
 }
 
 dependencyResolutionManagement {

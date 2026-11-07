@@ -31,6 +31,9 @@ android {
 
 dependencies {
     implementation(project(":speech"))
+    implementation(project(":diarization"))
+    // Рантайм для Nemotron. У sherpa-onnx в speech рантайм встроен статически, своего libonnxruntime.so у него нет.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
     implementation("androidx.activity:activity-ktx:1.13.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
 }

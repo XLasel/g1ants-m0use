@@ -1,7 +1,9 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+// Версия плагина задана в settings.gradle.kts этого модуля и действует только при отдельной сборке.
+// В общем проекте берётся Kotlin, который уже подключён вместе с AGP.
 plugins {
-    kotlin("jvm") version "2.2.20"
+    kotlin("jvm")
 }
 
 // Та же версия, что в Python-прототипе.

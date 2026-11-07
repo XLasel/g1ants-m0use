@@ -17,4 +17,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "stenographer"
-include(":speech", ":app")
+include(":speech", ":diarization", ":app")
