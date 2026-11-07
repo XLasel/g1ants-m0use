@@ -1,6 +1,6 @@
 # Распознавание речи на Android (роль 2)
 
-Модуль `speech` читает аудио и распознаёт речь локально, а `app` — временный экран для замеров на телефоне.
+Модуль `speech` читает аудио и распознаёт речь локально, а `bench` — временный экран для замеров на телефоне (`:app` занят под интерфейс).
 
 **Статус:** проект собирается, 15 модульных тестов проходят. Проверено на одном телефоне (HUAWEI ADY-LX9, Android 12), пока без диаризации:
 
@@ -38,7 +38,7 @@
 Дальше откройте папку `android` в Android Studio или соберите из терминала:
 
 ```bash
-./gradlew :speech:testDebugUnitTest :app:assembleDebug
+./gradlew :speech:testDebugUnitTest :bench:assembleDebug
 ```
 
 Если при первой сборке обрывается соединение, запустите команду ещё раз: уже скачанные зависимости сохраняются.
@@ -46,7 +46,7 @@
 ## Как замерить на телефоне
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r bench/build/outputs/apk/debug/bench-debug.apk
 ```
 
 ```bash
