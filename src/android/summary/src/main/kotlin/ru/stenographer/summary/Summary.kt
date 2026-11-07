@@ -187,7 +187,8 @@ class LocalSummarizer(
                 throw SummaryException("Summary has no source-linked content")
             }
             // Ошибка оформления названия не должна уничтожать проверенные пункты конспекта.
-            val title = normalizedTitle(titleValue)
+            // Маленькие модели иногда переписывают в название кусок инструкции («3–6 слов на языке записи»).
+            val title = normalizedTitle(titleValue)?.takeUnless { echoesPrompt(it) }
                 ?: (listOfNotNull(topic) + decisions + tasks).firstNotNullOfOrNull { normalizedTitle(it.text) }
                 ?: "Краткий конспект разговора"
             return Draft(title, topic, decisions, tasks)
@@ -206,6 +207,17 @@ class LocalSummarizer(
         val title = words.joinToString(" ").trimEnd { it in "\"'«»“”.!?…" }
         return title.takeIf { words.size in 3..6 && it.length <= 160 }
     }
+
+    /** Название повторяет инструкцию: любые три слова подряд из него встречаются подряд в промпте. */
+    private fun echoesPrompt(title: String): Boolean {
+        val words = promptWords(title)
+        if (words.size < 3) return false
+        val prompt = " " + promptWords(SYSTEM).joinToString(" ") + " "
+        return words.windowed(3).any { prompt.contains(" " + it.joinToString(" ") + " ") }
+    }
+
+    private fun promptWords(text: String): List<String> =
+        text.lowercase().replace('ё', 'е').split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }
 
     private fun render(draft: Draft, source: List<SourceUtterance>): SummaryResult {
         fun points(kind: String, items: List<Evidence>) = items.map {
