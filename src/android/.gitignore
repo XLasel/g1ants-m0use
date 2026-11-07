@@ -1,0 +1,11 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+# Большие файлы: их кладёт scripts/prepare_speech.sh
+speech/libs/*.aar
+speech/src/main/assets/models/
+.kotlin/
+# Модель диаризации: её кладёт scripts/prepare_diarization.sh
+app/src/main/assets/models/nemotron/
