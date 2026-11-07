@@ -32,7 +32,6 @@ import java.io.IOException
 import java.io.RandomAccessFile
 import kotlin.math.sqrt
 
-/** Состояние записи с микрофона, на него подписан экран записи. */
 data class RecorderState(
     val active: Boolean = false,
     val paused: Boolean = false,

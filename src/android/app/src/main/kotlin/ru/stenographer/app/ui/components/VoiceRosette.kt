@@ -32,7 +32,7 @@ import kotlin.math.sin
 
 /*
  * Узор голоса: роза r = cos(a/b · θ) внутри «печеньки» Material 3.
- * Число лепестков зависит от высоты голоса, поэтому голоса узнаются на глаз.
+ * Форма выбирается по номеру голоса, чтобы соседние голоса не путались.
  * Все координаты считаем в квадрате 40×40, как в прототипе, и масштабируем.
  */
 
@@ -44,11 +44,8 @@ private val DEFAULT_SHAPES = listOf(
     RoseShape(4, 1, 8), RoseShape(5, 1, 10), RoseShape(8, 3, 7),
 )
 
-private fun shapeFor(speaker: Speaker): RoseShape {
-    // Силуэты подобраны так, чтобы голоса не путались между собой (как в прототипе).
-    // Высоту голоса пока не используем: при подстановке числа лепестков узоры становились одинаковыми «ромашками».
-    return DEFAULT_SHAPES[speaker.index.mod(DEFAULT_SHAPES.size)]
-}
+// Высоту голоса пока не используем: при подстановке числа лепестков узоры становились одинаковыми «ромашками».
+private fun shapeFor(speaker: Speaker): RoseShape = DEFAULT_SHAPES[speaker.index.mod(DEFAULT_SHAPES.size)]
 
 /** Контур розы в квадрате 40×40; progress < 1 рисует только начало линии (анимация появления). */
 private fun rosePath(r: Float, a: Int, b: Int, progress: Float): Path {

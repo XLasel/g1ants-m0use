@@ -8,14 +8,12 @@ import ru.stenographer.core.Utterance
 @Serializable
 data class Recording(
     val id: String,
-    /** Название: сначала имя файла или дата, после конспекта его предлагает модель. */
     val title: String,
     /** true, если название меняли руками: тогда модель его не трогает. */
     val titleEdited: Boolean = false,
     /** Имя исходного файла без расширения: по нему называем экспорт, чтобы JSON легко сопоставить с аудио. */
     val sourceName: String? = null,
     val createdAt: Long,
-    /** Файл звука внутри приложения (копия импортированного или записанного). */
     val audioPath: String,
     val durationMs: Long = 0,
     val status: Status = Status.QUEUED,
@@ -33,17 +31,9 @@ data class Recording(
     fun speaker(id: String): Speaker? = speakers.firstOrNull { it.id == id }
 }
 
-/**
- * Голос в записи. index задаёт цвет и узор по умолчанию,
- * petals считается из высоты голоса, когда обработка её сообщит.
- */
+/** Голос в записи. index задаёт цвет и узор. */
 @Serializable
-data class Speaker(
-    val id: String,
-    val name: String,
-    val index: Int,
-    val petals: Int = 0,
-)
+data class Speaker(val id: String, val name: String, val index: Int)
 
 @Serializable
 data class Summary(val title: String, val text: String, val points: List<@Serializable(SummaryPointSerializer::class) SummaryPoint>)

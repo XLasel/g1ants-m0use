@@ -26,7 +26,6 @@ private data class ExportLine(
     val text: String,
 )
 
-/** Превращает запись в JSON или текст и сохраняет в «Загрузки». */
 object TranscriptExport {
     private val json = Json { prettyPrint = true }
 

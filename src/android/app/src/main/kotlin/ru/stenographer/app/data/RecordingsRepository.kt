@@ -61,7 +61,6 @@ class RecordingsRepository(
         rec
     }
 
-    /** Новый файл для записи с микрофона. */
     fun newRecordingFile(id: String): File = File(audioDir, "$id.wav")
 
     fun add(rec: Recording) {

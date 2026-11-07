@@ -74,10 +74,6 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-/**
- * Главная: записи плиткой, внизу «Загрузить» и кнопка записи.
- * Если записей нет, в центре одна большая кнопка записи.
- */
 @Composable
 fun HomeScreen(
     recordings: List<Recording>,

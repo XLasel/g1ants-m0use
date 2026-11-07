@@ -13,7 +13,6 @@ import ru.stenographer.core.Segment
 import ru.stenographer.core.Stage
 import ru.stenographer.core.Word
 import java.io.File
-import kotlin.math.roundToInt
 
 /** То, что видно на экране обработки, пока запись ещё не готова. */
 data class LiveProgress(
@@ -55,7 +54,6 @@ class ProcessingQueue(
     private val channel = Channel<String>(Channel.UNLIMITED)
 
     private val _live = MutableStateFlow<LiveProgress?>(null)
-    /** Прогресс записи, которая обрабатывается прямо сейчас. */
     val live: StateFlow<LiveProgress?> = _live.asStateFlow()
 
     /** Сколько записей ждёт или обрабатывается; сервис живёт, пока здесь не ноль. */
@@ -104,9 +102,8 @@ class ProcessingQueue(
                 }
                 // Отрезки приходят порциями: в каждой только новые, закрытые отрезки.
                 is PipelineEvent.Segments -> _live.update { it?.copy(segments = it.segments + e.segments) }
-                is PipelineEvent.SpeakerFeatures -> repository.update(id) { r ->
-                    r.copy(speakers = r.speakers.map { s -> if (s.id == e.speakerId) s.copy(petals = petalsFor(e.pitchMedianHz)) else s })
-                }
+                // Высота голоса пока не используется: узор выбирается по номеру голоса.
+                is PipelineEvent.SpeakerFeatures -> Unit
                 is PipelineEvent.Words -> _live.update { it?.copy(words = it.words + e.words, processedUntilMs = e.processedUntilMs) }
                 is PipelineEvent.Summary -> repository.update(id) { r ->
                     r.copy(
@@ -140,6 +137,4 @@ class ProcessingQueue(
         }
     }
 
-    /** Чем выше голос, тем больше лепестков в его узоре: 3..9. */
-    private fun petalsFor(pitchHz: Float): Int = (3 + (pitchHz - 80f) / 30f).roundToInt().coerceIn(3, 9)
 }

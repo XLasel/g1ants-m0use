@@ -145,7 +145,6 @@ fun StenographerTheme(mode: ThemeMode, content: @Composable () -> Unit) {
     }
 }
 
-/** Короткий доступ к дополнительным цветам: Extra.colors.voice(1). */
 object Extra {
     val colors: ExtraColors
         @Composable get() = LocalExtraColors.current

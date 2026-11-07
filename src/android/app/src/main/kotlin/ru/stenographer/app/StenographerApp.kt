@@ -58,7 +58,7 @@ class AppContainer(private val context: Context) {
         if (queue.pending.value > 0) runCatching { ProcessingService.start(context) }
     }
 
-    /** Импортирует файлы и ставит их в очередь. @return id первой записи, чтобы открыть её обработку. */
+    /** @return id первой записи, чтобы сразу открыть её обработку. */
     suspend fun importAndQueue(uris: List<Uri>): String? {
         var first: String? = null
         for (uri in uris) {
@@ -70,7 +70,6 @@ class AppContainer(private val context: Context) {
         return first
     }
 
-    /** Добавляет записанный с микрофона файл и ставит в очередь. */
     fun addRecorded(id: String, file: File, title: String, startService: Boolean = true) {
         repository.add(Recording(id = id, title = title, createdAt = System.currentTimeMillis(), audioPath = file.absolutePath))
         queue.enqueue(id)

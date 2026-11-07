@@ -96,10 +96,6 @@ import ru.stenographer.core.Utterance
 
 private enum class Tab(val label: String) { TEXT("Текст"), SUMMARY("Конспект"), VOICES("Голоса") }
 
-/**
- * Расшифровка: дорожки голосов сверху, под ними вкладки и плеер внизу.
- * Тап по реплике перематывает к ней, тап по узору голоса включает соло.
- */
 @Composable
 fun TranscriptScreen(
     rec: Recording,
@@ -395,7 +391,6 @@ private fun utteranceText(u: Utterance, positionMs: Long, query: String, voice: 
     }
 }
 
-/** Вкладки как в прототипе: подчёркивание на всю ширину вкладки, общая линия снизу. */
 @Composable
 private fun Tabs(selected: Tab, onSelect: (Tab) -> Unit) {
     val ink = MaterialTheme.colorScheme.onSurface
@@ -589,7 +584,6 @@ private fun VoicesTab(
     }
 }
 
-/** Серая кнопка-плашка, как в прототипе. */
 @Composable
 private fun Pill(label: String, onClick: () -> Unit) {
     Box(

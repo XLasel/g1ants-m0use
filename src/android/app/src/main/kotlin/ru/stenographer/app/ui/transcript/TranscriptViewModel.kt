@@ -19,7 +19,6 @@ import ru.stenographer.app.data.Recording
 import ru.stenographer.app.data.mergeSpeaker
 import java.io.File
 
-/** Состояние плеера на экране расшифровки. */
 data class PlayerState(
     val positionMs: Long = 0,
     val playing: Boolean = false,

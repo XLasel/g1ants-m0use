@@ -51,10 +51,6 @@ import ru.stenographer.app.ui.theme.Extra
 import ru.stenographer.app.ui.theme.dialogColor
 import java.util.Locale
 
-/**
- * Запись с микрофона: крупный таймер, лента громкости и две кнопки.
- * «Готово» отправляет запись на расшифровку, крестик спрашивает, что делать с записанным.
- */
 @Composable
 fun RecordScreen(
     state: RecorderState,

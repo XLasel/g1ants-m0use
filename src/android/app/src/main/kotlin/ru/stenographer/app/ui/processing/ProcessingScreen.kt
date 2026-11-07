@@ -51,11 +51,6 @@ import ru.stenographer.app.ui.components.VoiceRosette
 import ru.stenographer.app.ui.nbsp
 import ru.stenographer.core.Stage
 
-/**
- * Обработка записи. Пока идёт расшифровка, на экране появляются найденные голоса:
- * их узоры дорисовываются, а прогресс этапов идёт внизу.
- * Можно свернуть: обработка продолжится в фоне.
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ProcessingScreen(
