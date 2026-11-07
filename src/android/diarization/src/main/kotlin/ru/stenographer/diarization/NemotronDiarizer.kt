@@ -53,19 +53,72 @@ class NemotronDiarizer private constructor(
      * @param audio звук 16 кГц, моно, от -1 до 1
      * @param onProgress доля от 0 до 1 и число спикеров, найденных к этому моменту
      */
-    fun diarize(audio: FloatArray, onProgress: (Float, Int) -> Unit = { _, _ -> }): FrameProbs {
+    fun diarize(audio: FloatArray, onProgress: (Float, Int) -> Unit = { _, _ -> }): FrameProbs =
+        diarize(audio, onProgress) { _, _ -> }
+
+    internal fun diarize(
+        audio: FloatArray,
+        onProgress: (Float, Int) -> Unit,
+        onChunk: (Int, SpeakerCache) -> Unit,
+    ): FrameProbs {
         if (audio.size < HOP_LENGTH * SUBSAMPLING) return FrameProbs(FloatArray(0))
         val featureFrames = logMel.frameCount(audio.size)
-        val embeds = embed(logMel.compute(audio), featureFrames)
-        return diarizeEmbeds(embeds, featureFrames, onProgress)
+        val source = BlockEmbeds(audio, featureFrames)
+        return runChunks(source.count, featureFrames, source::rows, onProgress, onChunk)
     }
 
-    /** Цикл по чанкам с кэшем спикеров. [onChunk] получает состояние кэша после каждого чанка (для тестов). */
+    /** Цикл по готовым эмбеддингам (для сверки с Python). */
     internal fun diarizeEmbeds(
         embeds: List<FloatArray>,
         featureFrames: Int,
         onProgress: (Float, Int) -> Unit = { _, _ -> },
         onChunk: (Int, SpeakerCache) -> Unit = { _, _ -> },
+    ): FrameProbs = runChunks(embeds.size, featureFrames, { a, b -> embeds.subList(a, b) }, onProgress, onChunk)
+
+    /**
+     * Эмбеддинги блоками по [blockFrames] кадров признаков. Блок получает по [BLOCK_CONTEXT] кадров с каждой
+     * стороны, поэтому совпадает с прогоном по всей записи точно (проверено, расхождение 0). Уже пройденные
+     * строки освобождаются: в памяти лежит один блок, а не признаки и эмбеддинги всей записи.
+     */
+    private inner class BlockEmbeds(private val audio: FloatArray, private val featureFrames: Int) {
+        val count = (featureFrames + SUBSAMPLING - 1) / SUBSAMPLING
+        private val rows = arrayOfNulls<FloatArray>(count)
+        private var computed = 0
+        private var released = 0
+
+        fun rows(from: Int, to: Int): List<FloatArray> {
+            while (computed < to) computeBlock()
+            while (released < from) rows[released++] = null
+            return List(to - from) { rows[from + it]!! }
+        }
+
+        private fun computeBlock() {
+            val a = computed * SUBSAMPLING
+            val b = min(a + blockFrames, featureFrames)
+            val lo = maxOf(0, a - BLOCK_CONTEXT)
+            val hi = min(featureFrames, b + BLOCK_CONTEXT)
+            val block = embed(logMel.compute(audio, lo, hi), hi - lo)
+            val offset = (a - lo) / SUBSAMPLING
+            val take = min((b - a + SUBSAMPLING - 1) / SUBSAMPLING, count - computed)
+            for (k in 0 until take) rows[computed + k] = block[offset + k]
+            computed += take
+        }
+    }
+
+    /** Кадров признаков в блоке эмбеддингов: 8000 — это 80 с звука. Кратно 8. */
+    internal var blockFrames = 8000
+        set(value) {
+            require(value > 0 && value % SUBSAMPLING == 0) { "Размер блока должен быть кратен $SUBSAMPLING" }
+            field = value
+        }
+
+    /** Цикл по чанкам с кэшем спикеров. [onChunk] получает состояние кэша после каждого чанка (для тестов). */
+    private fun runChunks(
+        total: Int,
+        featureFrames: Int,
+        rowsOf: (Int, Int) -> List<FloatArray>,
+        onProgress: (Float, Int) -> Unit,
+        onChunk: (Int, SpeakerCache) -> Unit,
     ): FrameProbs {
         val cache = SpeakerCache(silence)
         var chunkIndex = 0
@@ -73,11 +126,11 @@ class NemotronDiarizer private constructor(
         var written = 0 // строк в output
         val seen = BooleanArray(NUM_SPEAKERS)
         var start = 0
-        while (start < embeds.size) {
-            val end = min(start + CHUNK_LENGTH, embeds.size)
-            val chunkEnd = min(end + CHUNK_RIGHT_CONTEXT, embeds.size)
+        while (start < total) {
+            val end = min(start + CHUNK_LENGTH, total)
+            val chunkEnd = min(end + CHUNK_RIGHT_CONTEXT, total)
             val context = cache.context()
-            val stepEmbeds = context + embeds.subList(start, chunkEnd)
+            val stepEmbeds = context + rowsOf(start, chunkEnd)
             val logits = runStep(stepEmbeds)
             val logitRows = logits.size / NUM_SPEAKERS
 
@@ -106,7 +159,7 @@ class NemotronDiarizer private constructor(
                 written++
             }
             start = end
-            onProgress(start.toFloat() / embeds.size, seen.count { it })
+            onProgress(start.toFloat() / total, seen.count { it })
         }
         return FrameProbs(if (written == featureFrames) output else output.copyOf(written * NUM_SPEAKERS))
     }
@@ -133,6 +186,9 @@ class NemotronDiarizer private constructor(
     }
 
     companion object {
+        /** Кадров признаков контекста с каждой стороны блока. Точности хватает и 64, взято с запасом. Кратно 8. */
+        private const val BLOCK_CONTEXT = 128
+
         /**
          * Загружает модель из папки с файлами [Nemotron.MODEL_FILES].
          * @param stepFile можно указать step.onnx (fp32) для сравнения, по умолчанию int8
