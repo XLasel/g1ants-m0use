@@ -84,10 +84,20 @@ internal class AssetModelInstaller(
             listOf("embed.onnx", "step_int8.onnx", "mel_filters.bin", "silence_embeds.bin"),
         )
 
-        /** Qwen для названия и конспекта, кладёт scripts/prepare_summary.sh. */
+        /**
+         * Модель названия и конспекта, кладёт scripts/prepare_summary.sh. В APK может лежать любая GGUF под именем
+         * [SUMMARY_FILE], поэтому папка копии зависит от её размера: другая модель скопируется заново, а не
+         * возьмётся старая копия.
+         */
         fun summary(context: Context) = AssetModelInstaller(
-            context, "models/summary", "qwen2.5-1.5b-instruct-q4_k_m", listOf(SUMMARY_FILE),
+            context, "models/summary", "summary-${bundledSize(context, "models/summary/$SUMMARY_FILE")}", listOf(SUMMARY_FILE),
         )
+
+        private fun bundledSize(context: Context, path: String): Long = try {
+            context.assets.openFd(path).use { it.length }
+        } catch (_: IOException) {
+            0L
+        }
 
         const val SUMMARY_FILE = "summary.gguf"
     }
