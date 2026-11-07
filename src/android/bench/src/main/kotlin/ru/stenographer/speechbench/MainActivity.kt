@@ -138,7 +138,13 @@ class MainActivity : ComponentActivity() {
                 }
                 is PipelineEvent.Summary -> summary = event
                 is PipelineEvent.Failed -> failure = event.reason
-                is PipelineEvent.SpeakerFeatures -> Unit
+                is PipelineEvent.SpeakerFeatures -> {
+                    events.put(JSONObject().put("type", "SpeakerFeatures").put("at_ms", at).put("speaker_id", event.speakerId)
+                        .put("pitch_hz", event.pitchMedianHz.toDouble()).put("pitch_spread", event.pitchSpread.toDouble())
+                        .put("loudness", event.loudnessMean.toDouble()))
+                    say("  ${event.speakerId}: тон %.0f Гц, интонация %.2f, громкость %.2f"
+                        .format(event.pitchMedianHz, event.pitchSpread, event.loudnessMean))
+                }
             }
         }
 

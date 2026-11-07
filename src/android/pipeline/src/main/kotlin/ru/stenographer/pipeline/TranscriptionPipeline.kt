@@ -15,6 +15,7 @@ import ru.stenographer.core.PipelineEvent.Decoded
 import ru.stenographer.core.PipelineEvent.Done
 import ru.stenographer.core.PipelineEvent.Failed
 import ru.stenographer.core.PipelineEvent.Segments
+import ru.stenographer.core.PipelineEvent.SpeakerFeatures
 import ru.stenographer.core.PipelineEvent.SpeakerFound
 import ru.stenographer.core.PipelineEvent.StageProgress
 import ru.stenographer.core.PipelineEvent.Summary
@@ -25,6 +26,7 @@ import ru.stenographer.core.Utterance
 import ru.stenographer.diarization.ChunkPlanner
 import ru.stenographer.diarization.NemotronDiarizer
 import ru.stenographer.diarization.TranscriptMerger
+import ru.stenographer.diarization.VoiceFeatureExtractor
 import ru.stenographer.speech.AudioDecodeException
 import ru.stenographer.speech.MediaCodecAudioDecoder
 import ru.stenographer.speech.ModelInstaller
@@ -39,10 +41,13 @@ import ru.stenographer.core.SummaryPoint as CoreSummaryPoint
  * Настройки обработки.
  *
  * @param threads потоков для моделей; 4 — проверено на Pixel 7 Pro
- * @param summaryModel GGUF-модель для названия и конспекта; null — конспект не делается, событие Summary не придёт
+ * @param summaryEnabled делать ли название и конспект (настройка «конспект вкл/выкл»)
+ * @param summaryModel свой GGUF-файл модели конспекта; null — модель из APK, если она туда положена.
+ *   Если модели нет ни там, ни там, конспект не делается и событие Summary не придёт.
  */
 data class PipelineConfig(
     val threads: Int = 4,
+    val summaryEnabled: Boolean = true,
     val summaryModel: File? = null,
     val summaryContextSize: Int = 4096,
 )
@@ -76,7 +81,7 @@ class TranscriptionPipeline(context: Context, private val config: PipelineConfig
 
             // 2. Диаризация: голоса и отрезки отдаются после каждого куска 27 с
             progress.start(Stage.DIARIZE)
-            val diarizerDir = NemotronInstaller(context).install()
+            val diarizerDir = AssetModelInstaller.nemotron(context).install()
             val diarization = withContext(Dispatchers.Default) {
                 NemotronDiarizer.open(diarizerDir, config.threads).use { diarizer ->
                     diarizer.diarizeWithSegments(audio, onProgress = { p, _ -> progress.report(Stage.DIARIZE, p) }) { update ->
@@ -88,6 +93,16 @@ class TranscriptionPipeline(context: Context, private val config: PipelineConfig
                 }
             }
             progress.finish(Stage.DIARIZE)
+
+            // Характеристики голосов для узоров: тон и громкость по отрезкам, доли секунды. Не критично для расшифровки.
+            try {
+                withContext(Dispatchers.Default) { VoiceFeatureExtractor.extract(audio, diarization.segments) }
+                    .forEach { send(SpeakerFeatures(fileId, it.speakerId, it.pitchMedianHz, it.pitchSpread, it.loudnessMean)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Характеристики голосов не посчитаны", e)
+            }
 
             // 3. Распознавание по кускам речи из диаризации; Nemotron уже закрыт
             progress.start(Stage.RECOGNIZE)
@@ -112,7 +127,9 @@ class TranscriptionPipeline(context: Context, private val config: PipelineConfig
             send(Done(fileId, utterances))
 
             // 5. Название и конспект. Расшифровка уже отдана, ошибка здесь её не отменяет.
-            config.summaryModel?.let { model -> summarize(fileId, model, utterances, progress)?.let { send(it) } }
+            if (config.summaryEnabled) {
+                summaryModel()?.let { model -> summarize(fileId, model, utterances, progress)?.let { send(it) } }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -123,6 +140,29 @@ class TranscriptionPipeline(context: Context, private val config: PipelineConfig
 
     /** То же для файла, например записи из приложения. */
     fun process(fileId: String, file: File): Flow<PipelineEvent> = process(fileId, Uri.fromFile(file))
+
+    /**
+     * Копирует модели из APK во внутреннюю память заранее, например на первом запуске приложения: около 1,4 ГБ
+     * и 10–20 с на телефоне. Без этого вызова то же самое произойдёт на первой обработке. [onProgress] — доля от 0 до 1.
+     */
+    suspend fun installModels(onProgress: (Float) -> Unit = {}) {
+        val summary = AssetModelInstaller.summary(context).takeIf { config.summaryEnabled && it.isBundled() }
+        val steps = listOfNotNull<suspend ((Float) -> Unit) -> Unit>(
+            { p -> ModelInstaller(context).install(p) },
+            { p -> AssetModelInstaller.nemotron(context).install(p) },
+            summary?.let { installer -> { p -> installer.install(p) } },
+        )
+        steps.forEachIndexed { i, step -> step { onProgress((i + it) / steps.size) } }
+        onProgress(1f)
+    }
+
+    /** Свой файл из настроек или модель из APK; null — конспекта не будет. */
+    private suspend fun summaryModel(): File? {
+        config.summaryModel?.let { return it }
+        val installer = AssetModelInstaller.summary(context)
+        if (!installer.isBundled()) return null
+        return File(installer.install(), AssetModelInstaller.SUMMARY_FILE)
+    }
 
     private suspend fun summarize(
         fileId: String,
