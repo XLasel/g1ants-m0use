@@ -93,6 +93,7 @@ import ru.stenographer.app.ui.nbsp
 import ru.stenographer.app.ui.theme.Extra
 import ru.stenographer.app.ui.theme.dialogColor
 import ru.stenographer.core.Utterance
+import kotlin.math.roundToInt
 
 private enum class Tab(val label: String) { TEXT("Текст"), SUMMARY("Конспект"), VOICES("Голоса") }
 
@@ -533,7 +534,7 @@ private fun VoicesTab(
                 Column(Modifier.weight(1f)) {
                     Text(s.name, style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp), color = Extra.colors.voice(s.index))
                     Text(
-                        "$share% разговора, ${repliesLabel(mine.size)}",
+                        "$share% разговора, " + (s.pitchHz?.let { "около ${it.roundToInt()} Гц" } ?: repliesLabel(mine.size)),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

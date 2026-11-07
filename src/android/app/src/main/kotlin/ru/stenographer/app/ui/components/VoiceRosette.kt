@@ -39,13 +39,14 @@ import kotlin.math.sin
 /** Параметры розы a/b и число зубцов печеньки для голоса. */
 private data class RoseShape(val a: Int, val b: Int, val cookie: Int)
 
-private val DEFAULT_SHAPES = listOf(
-    RoseShape(3, 1, 6), RoseShape(5, 2, 9), RoseShape(7, 3, 4),
-    RoseShape(4, 1, 8), RoseShape(5, 1, 10), RoseShape(8, 3, 7),
+// Силуэты по возрастанию числа лепестков: 3, 5, 5, 7, 8, 8. Соседние заметно разные, чтобы голоса не путались.
+private val SHAPES = listOf(
+    RoseShape(3, 1, 6), RoseShape(5, 2, 9), RoseShape(5, 1, 10),
+    RoseShape(7, 3, 4), RoseShape(4, 1, 8), RoseShape(8, 3, 7),
 )
 
-// Высоту голоса пока не используем: при подстановке числа лепестков узоры становились одинаковыми «ромашками».
-private fun shapeFor(speaker: Speaker): RoseShape = DEFAULT_SHAPES[speaker.index.mod(DEFAULT_SHAPES.size)]
+/** По высоте голоса, если она известна, иначе по порядку появления. */
+private fun shapeFor(speaker: Speaker): RoseShape = SHAPES[(speaker.shape ?: speaker.index).mod(SHAPES.size)]
 
 /** Контур розы в квадрате 40×40; progress < 1 рисует только начало линии (анимация появления). */
 private fun rosePath(r: Float, a: Int, b: Int, progress: Float): Path {

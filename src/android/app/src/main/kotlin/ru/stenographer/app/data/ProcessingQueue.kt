@@ -84,7 +84,7 @@ class ProcessingQueue(
         repository.update(id) { it.copy(status = Recording.Status.PROCESSING, error = null) }
         _live.value = LiveProgress(id)
         // Конспект делаем, только если он включён и модель для него есть в приложении.
-        val withSummary = settings.summaryEnabled && models.summaryAvailable()
+        val withSummary = settings.summaryEnabled && models.summaryBundled
 
         models.process(id, File(rec.audioPath), withSummary).collect { e ->
             when (e) {
@@ -102,8 +102,9 @@ class ProcessingQueue(
                 }
                 // Отрезки приходят порциями: в каждой только новые, закрытые отрезки.
                 is PipelineEvent.Segments -> _live.update { it?.copy(segments = it.segments + e.segments) }
-                // Высота голоса пока не используется: узор выбирается по номеру голоса.
-                is PipelineEvent.SpeakerFeatures -> Unit
+                is PipelineEvent.SpeakerFeatures -> repository.update(id) { r ->
+                    r.copy(speakers = r.speakers.map { if (it.id == e.speakerId) it.copy(pitchHz = e.pitchMedianHz) else it }.withShapesByPitch())
+                }
                 is PipelineEvent.Words -> _live.update { it?.copy(words = it.words + e.words, processedUntilMs = e.processedUntilMs) }
                 is PipelineEvent.Summary -> repository.update(id) { r ->
                     r.copy(

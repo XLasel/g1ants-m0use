@@ -31,9 +31,25 @@ data class Recording(
     fun speaker(id: String): Speaker? = speakers.firstOrNull { it.id == id }
 }
 
-/** Голос в записи. index задаёт цвет и узор. */
+/**
+ * Голос в записи. index — порядок появления, задаёт цвет.
+ * Узор зависит от высоты голоса: [shape] — место голоса среди остальных от самого низкого к самому высокому.
+ * Пока обработка не посчитала высоту, узор выбирается по index.
+ */
 @Serializable
-data class Speaker(val id: String, val name: String, val index: Int)
+data class Speaker(
+    val id: String,
+    val name: String,
+    val index: Int,
+    val pitchHz: Float? = null,
+    val shape: Int? = null,
+)
+
+/** Раздаёт узоры по высоте голосов: низкий голос — меньше лепестков, высокий — больше. */
+fun List<Speaker>.withShapesByPitch(): List<Speaker> {
+    val ranks = filter { it.pitchHz != null }.sortedBy { it.pitchHz }.mapIndexed { rank, s -> s.id to rank }.toMap()
+    return map { s -> ranks[s.id]?.let { s.copy(shape = it) } ?: s }
+}
 
 @Serializable
 data class Summary(val title: String, val text: String, val points: List<@Serializable(SummaryPointSerializer::class) SummaryPoint>)
