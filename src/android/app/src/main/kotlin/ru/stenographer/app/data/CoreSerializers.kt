@@ -27,7 +27,12 @@ private class UtteranceSurrogate(
 )
 
 @Serializable
-private class SummaryPointSurrogate(val text: String, val sourceStartMs: Long)
+private class SummaryPointSurrogate(
+    val text: String,
+    val sourceStartMs: Long,
+    val kind: String = "topic",
+    val speakerId: String? = null,
+)
 
 object UtteranceSerializer : KSerializer<Utterance> {
     override val descriptor: SerialDescriptor = UtteranceSurrogate.serializer().descriptor
@@ -47,8 +52,13 @@ object SummaryPointSerializer : KSerializer<SummaryPoint> {
     override val descriptor: SerialDescriptor = SummaryPointSurrogate.serializer().descriptor
 
     override fun serialize(encoder: Encoder, value: SummaryPoint) =
-        encoder.encodeSerializableValue(SummaryPointSurrogate.serializer(), SummaryPointSurrogate(value.text, value.sourceStartMs))
+        encoder.encodeSerializableValue(
+            SummaryPointSurrogate.serializer(),
+            SummaryPointSurrogate(value.text, value.sourceStartMs, value.kind, value.speakerId),
+        )
 
     override fun deserialize(decoder: Decoder): SummaryPoint =
-        decoder.decodeSerializableValue(SummaryPointSurrogate.serializer()).let { SummaryPoint(it.text, it.sourceStartMs) }
+        decoder.decodeSerializableValue(SummaryPointSurrogate.serializer()).let {
+            SummaryPoint(it.text, it.sourceStartMs, it.kind, it.speakerId)
+        }
 }
