@@ -1,60 +1,46 @@
 {
-  "model_file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+  "model_file": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
   "summary": {
-    "text": "Тема\n\u2022 Обсуждаем подготовку приложения к защите на хакатоне.\n\nРешения\n\u2022 Договорились проверить итоговый APK без интернета на телефоне.\n\u2022 Я проверю установку приложения и сохраню результаты замеров к утру.\n\u2022 Я подготовлю презентацию и покажу экспорт JSON на защите.\n\nЗадачи\n\u2014",
-    "title": "Подготовка к защите на хакатоне",
-    "points": [
-      {
-        "source_start_ms": 0,
-        "kind": "topic",
-        "speaker_id": "speaker_1",
-        "text": "Обсуждаем подготовку приложения к защите на хакатоне."
-      },
-      {
-        "source_start_ms": 5000,
-        "kind": "decision",
-        "speaker_id": "speaker_2",
-        "text": "Договорились проверить итоговый APK без интернета на телефоне."
-      },
-      {
-        "source_start_ms": 15000,
-        "kind": "decision",
-        "speaker_id": "speaker_2",
-        "text": "Я проверю установку приложения и сохраню результаты замеров к утру."
-      },
-      {
-        "source_start_ms": 20000,
-        "kind": "decision",
-        "speaker_id": "speaker_1",
-        "text": "Я подготовлю презентацию и покажу экспорт JSON на защите."
-      }
-    ]
+    "text": "Тема\n\u2022 Обсуждаем подготовку приложения к защите на хакатоне.\n\nРешения\n\u2014\n\nЗадачи\n\u2014",
+    "title": "АПК проверка итоговый",
+    "points": [{
+      "source_start_ms": 0,
+      "kind": "topic",
+      "speaker_id": "speaker_1",
+      "text": "Обсуждаем подготовку приложения к защите на хакатоне."
+    }]
   },
   "utterances": 4,
   "context_size": 4096,
   "model_closed": true,
-  "os": "Linux",
+  "os": "Mac OS X",
   "point_text_is_source_excerpt": true,
   "kind": "summary_host_inference",
   "threads": 4,
-  "cpu": "AMD EPYC 9V74 80-Core Processor",
   "input_kind": "transcript_not_audio",
   "validation_scope": "JSON, source excerpts, timestamps and lifecycle; not a semantic quality score",
   "point_speaker_is_source_speaker": true,
-  "load_ms": 797,
-  "model_bytes": 1117320736,
-  "model_sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
-  "java": "17.0.20",
-  "peak_rss_mb": 1922,
-  "calls": [{
-    "raw_json": "{\"title\":\"Подготовка к защите на хакатоне\",\"topic\":{\"source_id\":0},\"decisions\":[{\"source_id\":1},{\"source_id\":2},{\"source_id\":3}],\"tasks\":[]}",
-    "prompt_tokens": 396,
-    "generation_ms": 5486,
-    "output_chars": 140
-  }],
+  "load_ms": 172,
+  "model_bytes": 491400032,
+  "model_sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+  "java": "17.0.20.1",
+  "calls": [
+    {
+      "raw_json": "{\"title\":\"3-6 слов на языке записи, без кавычек и точки в конце\",\"topic\":{\"source_id\":0},\"decisions\":[],\"tasks\":[]}",
+      "prompt_tokens": 396,
+      "generation_ms": 1742,
+      "output_chars": 115
+    },
+    {
+      "raw_json": "\"АПК проверка итоговый\"",
+      "prompt_tokens": 131,
+      "generation_ms": 533,
+      "output_chars": 23
+    }
+  ],
   "success": true,
-  "total_ms": 6391,
+  "total_ms": 2497,
   "transcript_unchanged": true,
-  "arch": "amd64",
+  "arch": "aarch64",
   "transcript_sha256": "13959a92e379dfac71f3b37a7a1597fabebd30355184be9ffc03ed8254e362aa"
 }
