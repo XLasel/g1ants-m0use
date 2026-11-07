@@ -87,7 +87,9 @@ class LocalSummarizer(
                 draft
             }
             if (drafts.size == 1) {
-                val result = render(drafts.single(), source)
+                val draft = drafts.single()
+                val title = requestTitle(source) { checkCancellation() } ?: draft.title
+                val result = render(draft.copy(title = title), source)
                 onProgress(1f)
                 return result
             }
@@ -199,21 +201,47 @@ class LocalSummarizer(
         }
     }
 
-    private fun normalizedTitle(value: String): String? {
+    /** @param minWords для отдельного запроса названия хватает и двух слов («Весенний снег»). */
+    private fun normalizedTitle(value: String, minWords: Int = 3): String? {
         val words = value.trim { it.isWhitespace() || it in "\"'«»“”.!?…" }
             .split(Regex("[\\s\\p{Z}]+"))
             .filter { word -> word.any { it.isLetterOrDigit() } }
             .take(6)
         val title = words.joinToString(" ").trimEnd { it in "\"'«»“”.!?…" }
-        return title.takeIf { words.size in 3..6 && it.length <= 160 }
+        return title.takeIf { words.size in minWords..6 && it.length <= 160 }
+    }
+
+    /**
+     * Название — отдельным коротким запросом по тексту разговора. В общем запросе маленькая модель переписывает
+     * в название кусок инструкции, а отдельно отвечает по сути: «Приключения в ноябре» вместо «3–6 слов на языке записи».
+     * Не вышло — остаётся название из общего ответа или из выбранных фраз.
+     */
+    private fun requestTitle(source: List<SourceUtterance>, checkCancellation: () -> Unit): String? {
+        var text = source.joinToString("\n") { it.text.replace("<|", "< |") }.take(TITLE_TEXT_CHARS)
+        val budget = generator.contextSize - TITLE_TOKENS - 32
+        while (text.isNotEmpty() && generator.countTokens(TITLE_SYSTEM, text) > budget) text = text.take(text.length * 3 / 4)
+        if (text.isBlank()) return null
+        return try {
+            checkCancellation()
+            val raw = generator.generate(GenerationRequest(TITLE_SYSTEM, text, TITLE_TOKENS, TITLE_GRAMMAR))
+            checkCancellation()
+            val value = JSONTokener(raw.trim()).nextValue() as? String ?: return null
+            normalizedTitle(value, minWords = 2)?.takeUnless { echoesPrompt(it) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /** Название повторяет инструкцию: любые три слова подряд из него встречаются подряд в промпте. */
     private fun echoesPrompt(title: String): Boolean {
         val words = promptWords(title)
         if (words.size < 3) return false
-        val prompt = " " + promptWords(SYSTEM).joinToString(" ") + " "
-        return words.windowed(3).any { prompt.contains(" " + it.joinToString(" ") + " ") }
+        return listOf(SYSTEM, TITLE_SYSTEM).any { system ->
+            val prompt = " " + promptWords(system).joinToString(" ") + " "
+            words.windowed(3).any { prompt.contains(" " + it.joinToString(" ") + " ") }
+        }
     }
 
     private fun promptWords(text: String): List<String> =
@@ -247,6 +275,17 @@ class LocalSummarizer(
             Не повторяй один фрагмент в разных разделах. Не добавляй собственных фактов или таймкодов.
             Верни только JSON: {"title":"Название записи в несколько слов","topic":{"source_id":0},"decisions":[],"tasks":[]}.
         """.trimIndent()
+
+        /** Запрос названия: короткий, без примеров — маленькая модель переписывает любой пример в ответ. */
+        internal val TITLE_SYSTEM =
+            "Придумай короткое название для разговора, как заголовок заметки: 3–5 слов, о чём говорили. Только название, без кавычек."
+
+        /** Ответ — одна JSON-строка без управляющих символов. */
+        internal val TITLE_GRAMMAR = """root ::= "\"" [^"\\\x00-\x1f]{3,80} "\"""""
+
+        /** Сколько текста разговора хватает модели, чтобы понять тему, и сколько токенов на ответ. */
+        private const val TITLE_TEXT_CHARS = 2000
+        private const val TITLE_TOKENS = 32
 
         internal val GRAMMAR = """
             root ::= "{" ws "\"title\"" ws ":" ws string ws "," ws "\"topic\"" ws ":" ws (item | "null") ws "," ws "\"decisions\"" ws ":" ws items ws "," ws "\"tasks\"" ws ":" ws items ws "}" ws
