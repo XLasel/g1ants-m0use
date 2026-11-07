@@ -77,13 +77,15 @@ object SummaryHostBenchmark {
             check(closed) { "Worker resumed before closing the model" }
             check(input.readBytes().contentEquals(original)) { "Transcript changed" }
             check(result.points.all { point -> source.any {
-                it.startMs == point.sourceStartMs && it.text.contains(point.text)
+                it.startMs == point.sourceStartMs && it.speakerId == point.speakerId && it.text.contains(point.text)
             } }) { "Summary point text must be an excerpt of its cited source" }
             report.put("success", true).put("model_closed", closed).put("transcript_unchanged", true)
                 .put("point_text_is_source_excerpt", true)
+                .put("point_speaker_is_source_speaker", true)
                 .put("summary", JSONObject().put("title", result.title).put("text", result.text)
                     .put("points", JSONArray(result.points.map {
                         JSONObject().put("text", it.text).put("source_start_ms", it.sourceStartMs)
+                            .put("kind", it.kind).put("speaker_id", it.speakerId)
                     })))
             println("Real-model host inference passed: ${result.title}")
         } catch (error: Throwable) {

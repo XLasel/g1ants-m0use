@@ -138,7 +138,9 @@ class TranscriptionPipeline(context: Context, private val config: PipelineConfig
                 progress.report(Stage.SUMMARY, it)
             }
             progress.finish(Stage.SUMMARY)
-            Summary(fileId, result.title, result.text, result.points.map { CoreSummaryPoint(it.text, it.sourceStartMs) })
+            Summary(fileId, result.title, result.text, result.points.map {
+                CoreSummaryPoint(it.text, it.sourceStartMs, it.kind, it.speakerId)
+            })
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
