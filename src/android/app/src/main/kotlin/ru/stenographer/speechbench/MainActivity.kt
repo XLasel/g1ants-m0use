@@ -20,11 +20,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import ru.stenographer.diarization.AsrWord
 import ru.stenographer.diarization.ChunkPlanner
-import ru.stenographer.diarization.FrameProbs
+import ru.stenographer.diarization.DiarizationResult
 import ru.stenographer.diarization.NemotronDiarizer
 import ru.stenographer.diarization.TranscriptJson
 import ru.stenographer.diarization.TranscriptMerger
-import ru.stenographer.diarization.renumberSpeakers
+import ru.stenographer.diarization.withSpeakerIds
 import ru.stenographer.speech.MediaCodecAudioDecoder
 import ru.stenographer.speech.ModelInstaller
 import ru.stenographer.speech.QuietChunker
@@ -113,23 +113,34 @@ class MainActivity : ComponentActivity() {
         report.put("envelope_points", envelope.size).put("envelope_mean", envelope.average())
 
         // Диаризация идёт до распознавания: её вероятности задают куски речи. Модель закрывается до загрузки GigaAM.
-        val probs: FrameProbs? = if (diarize) {
+        val diarization: DiarizationResult? = if (diarize) {
             val diarDir = stage("diar_install") { NemotronInstaller(this).install() }
             val diarizer = stage("diar_load") { withContext(Dispatchers.Default) { NemotronDiarizer.open(diarDir, threads) } }
+            val events = JSONArray()
+            val diarStarted = SystemClock.elapsedRealtime()
             val result = diarizer.use { d ->
                 stage("diarization") {
                     withContext(Dispatchers.Default) {
-                        d.diarize(audio) { progress, speakers ->
-                            Log.i(TAG, "diarization %.0f%%, голосов %d".format(progress * 100, speakers))
+                        // Порции для интерфейса: события SpeakerFound и Segments из контракта UI
+                        d.diarizeWithSegments(audio) { update ->
+                            val atMs = SystemClock.elapsedRealtime() - diarStarted
+                            events.put(JSONObject().put("at_ms", atMs).put("processed_until_ms", update.processedUntilMs)
+                                .put("new_speakers", update.newSpeakers.size).put("segments", update.segments.size)
+                                .put("final", update.final))
+                            update.newSpeakers.forEach {
+                                Log.i(TAG, "SpeakerFound ${it.speakerId} с ${it.firstAtMs} мс записи, через $atMs мс обработки")
+                            }
                         }
                     }
                 }
             }
-            report.put("diar_speakers", result.activeSpeakers())
+            report.put("diar_speakers", result.speakers.size).put("diar_segments", result.segments.size)
+                .put("diar_events", events)
             result
         } else {
             null
         }
+        val probs = diarization?.probs
         val chunks = probs?.let { ChunkPlanner.plan(it, audio) } ?: QuietChunker.plan(audio)
         val recognizer = stage("load") { SherpaRecognizer.open(modelDir, threads) }
         val asrStarted = SystemClock.elapsedRealtime()
@@ -149,9 +160,10 @@ class MainActivity : ComponentActivity() {
         report.put("chunk_events", chunkEvents).put("first_words_ms", firstWordsMs).put("processed_until_ms", lastProcessedMs)
 
         val safeName = name.replace(Regex("[^\\w.-]"), "_")
-        if (probs != null) {
+        if (diarization != null) {
             val utterances = stage("merge") {
-                TranscriptMerger.merge(words.map { AsrWord(it.text, it.startMs, it.endMs) }, probs).renumberSpeakers()
+                TranscriptMerger.merge(words.map { AsrWord(it.text, it.startMs, it.endMs) }, diarization.probs)
+                    .withSpeakerIds(diarization.speakers)
             }
             val transcript = File(getExternalFilesDir(null), "transcript_$safeName.json")
             transcript.writeText(TranscriptJson.encode(utterances))
