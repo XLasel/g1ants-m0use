@@ -40,3 +40,5 @@ artifacts/demo/*.mov
 artifacts/demo/*.mkv
 artifacts/demo/*.wav
 
+# Веса выбранной LLM для итогового APK, подготавливаются перед сборкой.
+src/android/pipeline/src/main/assets/models/summary/

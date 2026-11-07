@@ -24,8 +24,13 @@ data class Utterance(
     val words: List<Word> = emptyList(),
 )
 
-/** Пункт конспекта со ссылкой на момент записи. */
-data class SummaryPoint(val text: String, val sourceStartMs: Long)
+/** Пункт конспекта: раздел topic/decision/task, время и голос исходной реплики. */
+data class SummaryPoint(
+    val text: String,
+    val sourceStartMs: Long,
+    val kind: String = "topic",
+    val speakerId: String? = null,
+)
 
 /** Этапы обработки одного файла, по порядку. */
 enum class Stage { DECODE, DIARIZE, RECOGNIZE, MERGE, SUMMARY }
