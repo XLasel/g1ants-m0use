@@ -21,6 +21,7 @@ import ru.stenographer.speech.ModelInstaller
 import ru.stenographer.speech.QuietChunker
 import ru.stenographer.speech.SAMPLE_RATE
 import ru.stenographer.speech.SherpaRecognizer
+import ru.stenographer.speech.loudnessEnvelope
 import java.io.File
 
 /**
@@ -98,9 +99,25 @@ class MainActivity : ComponentActivity() {
         val audio = stage("decode") { MediaCodecAudioDecoder(this).decode(uri) }
         val seconds = audio.size.toDouble() / SAMPLE_RATE
         say("Длина записи: %.1f с".format(seconds))
+        val envelope = stage("envelope") { loudnessEnvelope(audio) }
+        report.put("envelope_points", envelope.size).put("envelope_mean", envelope.average())
         val chunks = QuietChunker.plan(audio)
         val recognizer = stage("load") { SherpaRecognizer.open(modelDir, threads) }
-        val words = recognizer.use { asr -> stage("asr") { asr.transcribe(audio, chunks) } }
+        val asrStarted = SystemClock.elapsedRealtime()
+        var firstWordsMs = -1L
+        var chunkEvents = 0
+        var lastProcessedMs = 0L
+        val words = recognizer.use { asr ->
+            stage("asr") {
+                asr.transcribe(audio, chunks, onChunk = { chunkWords, processedUntilMs ->
+                    chunkEvents++
+                    check(processedUntilMs >= lastProcessedMs) { "processedUntilMs уменьшился" }
+                    lastProcessedMs = processedUntilMs
+                    if (firstWordsMs < 0 && chunkWords.isNotEmpty()) firstWordsMs = SystemClock.elapsedRealtime() - asrStarted
+                })
+            }
+        }
+        report.put("chunk_events", chunkEvents).put("first_words_ms", firstWordsMs).put("processed_until_ms", lastProcessedMs)
 
         val processingMs = timings.getLong("decode") + timings.getLong("load") + timings.getLong("asr")
         val rtf = processingMs / 1000.0 / seconds

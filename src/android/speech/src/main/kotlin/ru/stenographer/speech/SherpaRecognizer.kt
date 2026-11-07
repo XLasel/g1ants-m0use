@@ -23,12 +23,15 @@ class SherpaRecognizer private constructor(private val recognizer: OfflineRecogn
         audio: FloatArray,
         chunks: List<LongRange>,
         onProgress: (Float) -> Unit,
+        onChunk: (words: List<Word>, processedUntilMs: Long) -> Unit,
     ): List<Word> = withContext(Dispatchers.Default) {
         mutex.withLock {
             val words = ArrayList<Word>()
             chunks.forEachIndexed { index, chunk ->
                 coroutineContext.ensureActive()
-                words += transcribeChunk(audio, chunk)
+                val chunkWords = transcribeChunk(audio, chunk)
+                words += chunkWords
+                onChunk(chunkWords, chunk.last)
                 onProgress((index + 1f) / chunks.size)
             }
             words

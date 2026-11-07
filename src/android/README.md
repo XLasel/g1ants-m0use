@@ -11,12 +11,15 @@
 | Пик памяти | 0,47–0,59 ГБ |
 | WER на 6 собранных русских диалогах | 7,5%, на Mac было около 7,2% |
 | Release-сборка | Та же скорость, что у debug |
+| Форматы | m4a, mp3, wav (16 и 44,1 кГц, стерео), flac, ogg/vorbis, ogg/opus 48 кГц как у голосовых Telegram |
+| Битые и пустые файлы | Понятная ошибка `AudioDecodeException` без падения приложения |
 
 ## Что внутри
 
 | Файл в `speech` | За что отвечает |
 |---|---|
 | `Contracts.kt` | Общие `Word`, `AudioDecoder`, `Recognizer` |
+| `Envelope.kt` | Огибающая громкости для события `Decoded` |
 | `MediaCodecAudioDecoder.kt` | Файл → звук 16 кГц, моно |
 | `Pcm.kt` | Сведение каналов и смена частоты |
 | `ModelInstaller.kt` | Копирование модели из APK во внутреннюю память |
@@ -75,12 +78,23 @@ python3 scripts/compare_words.py bench_test_2.m4a.4.json ../voicerec-original/re
 ## Как подключить в приложение
 
 ```kotlin
-val audio = MediaCodecAudioDecoder(context).decode(uri) { progress -> /* прогресс */ }
+val audio = MediaCodecAudioDecoder(context).decode(uri) { progress -> /* StageProgress(DECODE) */ }
+val envelope = loudnessEnvelope(audio) // Decoded: RMS по 50 мс, от 0 до 1
 val modelDir = ModelInstaller(context).install()
-val words = SherpaRecognizer.open(modelDir, threads = 4).use { it.transcribe(audio, chunks) }
+val words = SherpaRecognizer.open(modelDir, threads = 4).use { asr ->
+    asr.transcribe(
+        audio,
+        chunks,
+        onProgress = { progress -> /* StageProgress(RECOGNIZE) */ },
+        onChunk = { chunkWords, processedUntilMs -> /* Words */ },
+    )
+}
 ```
 
-`chunks` — куски речи как `началоМс..конецМс` от начала записи. Колбэки прогресса приходят не в главном потоке.
+`chunks` — куски речи как `началоМс..конецМс` от начала записи. `onChunk` вызывается после каждого куска,
+а `processedUntilMs` не уменьшается. Все колбэки приходят не в главном потоке.
+
+Ошибки чтения приходят как `AudioDecodeException`, её текст можно показывать пользователю.
 
 В `build.gradle.kts` итогового приложения нужны `androidResources { noCompress += "onnx" }` и `abiFilters += "arm64-v8a"`.
 В манифесте нужен `android:largeHeap="true"`.

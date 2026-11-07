@@ -16,10 +16,15 @@ interface AudioDecoder {
 
 /** Распознаёт куски речи. Таймкоды слов считаются от начала записи, а не куска. */
 interface Recognizer {
-    /** Каждый кусок задан как `началоМс..конецМс` от начала записи. [onProgress] получает долю от 0 до 1. */
+    /**
+     * Каждый кусок задан как `началоМс..конецМс` от начала записи. [onProgress] получает долю от 0 до 1.
+     * [onChunk] вызывается после каждого куска со словами этого куска и концом куска в мс: из этого
+     * получается событие `Words`. Возвращаются все слова записи.
+     */
     suspend fun transcribe(
         audio: FloatArray,
         chunks: List<LongRange>,
         onProgress: (Float) -> Unit = {},
+        onChunk: (words: List<Word>, processedUntilMs: Long) -> Unit = { _, _ -> },
     ): List<Word>
 }

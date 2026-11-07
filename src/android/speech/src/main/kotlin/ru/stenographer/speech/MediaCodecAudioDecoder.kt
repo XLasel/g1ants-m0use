@@ -24,11 +24,11 @@ class MediaCodecAudioDecoder(private val context: Context) : AudioDecoder {
             try {
                 extractor.setDataSource(context, uri, null)
             } catch (e: Exception) {
-                throw AudioDecodeException("Не удалось открыть файл: $uri", e)
+                throw AudioDecodeException("Не удалось открыть файл: формат не поддерживается или файл повреждён", e)
             }
             val track = (0 until extractor.trackCount).firstOrNull { index ->
                 extractor.getTrackFormat(index).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
-            } ?: throw AudioDecodeException("В файле нет звуковой дорожки")
+            } ?: throw AudioDecodeException("В файле не найден звук: файл повреждён или в нём нет звуковой дорожки")
             extractor.selectTrack(track)
             val format = extractor.getTrackFormat(track)
             val mime = format.getString(MediaFormat.KEY_MIME)!!
