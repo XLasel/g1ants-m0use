@@ -75,6 +75,30 @@ adb pull /sdcard/Android/data/ru.stenographer.speechbench/files/bench_test_2.m4a
 python3 scripts/compare_words.py bench_test_2.m4a.4.json ../voicerec-original/results/onnx/test_2.int8.json
 ```
 
+## Диаризация в замере (роль 3)
+
+Бенч по умолчанию гоняет всю цепочку: Nemotron → куски речи → GigaAM → реплики. Модуль `diarization` описан в `diarization/README.md`.
+
+Модель диаризации (около 106 МБ) кладётся отдельно: скрипт ищет `voicerec-original/models_onnx` рядом с репозиторием или рядом с папкой `android`, путь можно передать аргументом.
+
+```bash
+./scripts/prepare_diarization.sh
+```
+
+Запуск с диаризацией такой же, как выше. Без неё (старый замер только ASR) — с `--ez diarize false`:
+
+```bash
+adb shell am start -n ru.stenographer.speechbench/.MainActivity --es file test_2.m4a --ei threads 4
+```
+
+Кроме `bench_*.json` появится `transcript_test_2.m4a.json` в формате задания. В `bench_*.json` добавлены этапы `diar_install`, `diar_load`, `diarization`, `merge` и число спикеров, а `processing_ms` теперь включает диаризацию и склейку.
+
+```bash
+adb pull /sdcard/Android/data/ru.stenographer.speechbench/files/transcript_test_2.m4a.json
+```
+
+Что проверить первым: APK запускается и обе модели работают в одном процессе (`onnxruntime-android` рядом со статическим ONNX Runtime внутри sherpa-onnx). Если падает при загрузке `libonnxruntime.so` или на первом `diarize`, пришлите `adb logcat`.
+
 ## Как подключить в приложение
 
 ```kotlin

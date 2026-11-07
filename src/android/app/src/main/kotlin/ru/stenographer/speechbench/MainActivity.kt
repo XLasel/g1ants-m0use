@@ -13,9 +13,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import ru.stenographer.diarization.AsrWord
+import ru.stenographer.diarization.ChunkPlanner
+import ru.stenographer.diarization.FrameProbs
+import ru.stenographer.diarization.NemotronDiarizer
+import ru.stenographer.diarization.TranscriptJson
+import ru.stenographer.diarization.TranscriptMerger
+import ru.stenographer.diarization.renumberSpeakers
 import ru.stenographer.speech.MediaCodecAudioDecoder
 import ru.stenographer.speech.ModelInstaller
 import ru.stenographer.speech.QuietChunker
@@ -35,7 +44,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var pick: Button
 
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) start(uri, uri.lastPathSegment.orEmpty().substringAfterLast('/'), DEFAULT_THREADS)
+        if (uri != null) start(uri, uri.lastPathSegment.orEmpty().substringAfterLast('/'), DEFAULT_THREADS, diarize = true)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,16 +67,17 @@ class MainActivity : ComponentActivity() {
         val file = intent.getStringExtra(EXTRA_FILE)
         if (savedInstanceState == null && file != null) {
             val path = File(getExternalFilesDir(null), file)
-            start(Uri.fromFile(path), file, intent.getIntExtra(EXTRA_THREADS, DEFAULT_THREADS))
+            start(Uri.fromFile(path), file, intent.getIntExtra(EXTRA_THREADS, DEFAULT_THREADS),
+                intent.getBooleanExtra(EXTRA_DIARIZE, true))
         }
     }
 
-    private fun start(uri: Uri, name: String, threads: Int) {
+    private fun start(uri: Uri, name: String, threads: Int, diarize: Boolean) {
         pick.isEnabled = false
         output.text = ""
         lifecycleScope.launch {
             try {
-                bench(uri, name, threads)
+                bench(uri, name, threads, diarize)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -79,8 +89,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun bench(uri: Uri, name: String, threads: Int) {
-        val report = JSONObject().put("file", name).put("threads", threads)
+    private suspend fun bench(uri: Uri, name: String, threads: Int, diarize: Boolean) {
+        val report = JSONObject().put("file", name).put("threads", threads).put("diarize", diarize)
         val timings = JSONObject()
         val peaks = JSONObject()
 
@@ -101,7 +111,26 @@ class MainActivity : ComponentActivity() {
         say("Длина записи: %.1f с".format(seconds))
         val envelope = stage("envelope") { loudnessEnvelope(audio) }
         report.put("envelope_points", envelope.size).put("envelope_mean", envelope.average())
-        val chunks = QuietChunker.plan(audio)
+
+        // Диаризация идёт до распознавания: её вероятности задают куски речи. Модель закрывается до загрузки GigaAM.
+        val probs: FrameProbs? = if (diarize) {
+            val diarDir = stage("diar_install") { NemotronInstaller(this).install() }
+            val diarizer = stage("diar_load") { withContext(Dispatchers.Default) { NemotronDiarizer.open(diarDir, threads) } }
+            val result = diarizer.use { d ->
+                stage("diarization") {
+                    withContext(Dispatchers.Default) {
+                        d.diarize(audio) { progress, speakers ->
+                            Log.i(TAG, "diarization %.0f%%, голосов %d".format(progress * 100, speakers))
+                        }
+                    }
+                }
+            }
+            report.put("diar_speakers", result.activeSpeakers())
+            result
+        } else {
+            null
+        }
+        val chunks = probs?.let { ChunkPlanner.plan(it, audio) } ?: QuietChunker.plan(audio)
         val recognizer = stage("load") { SherpaRecognizer.open(modelDir, threads) }
         val asrStarted = SystemClock.elapsedRealtime()
         var firstWordsMs = -1L
@@ -119,14 +148,28 @@ class MainActivity : ComponentActivity() {
         }
         report.put("chunk_events", chunkEvents).put("first_words_ms", firstWordsMs).put("processed_until_ms", lastProcessedMs)
 
-        val processingMs = timings.getLong("decode") + timings.getLong("load") + timings.getLong("asr")
+        val safeName = name.replace(Regex("[^\\w.-]"), "_")
+        if (probs != null) {
+            val utterances = stage("merge") {
+                TranscriptMerger.merge(words.map { AsrWord(it.text, it.startMs, it.endMs) }, probs).renumberSpeakers()
+            }
+            val transcript = File(getExternalFilesDir(null), "transcript_$safeName.json")
+            transcript.writeText(TranscriptJson.encode(utterances))
+            report.put("utterances", utterances.size).put("speakers", utterances.map { it.speakerId }.distinct().size)
+                .put("transcript_file", transcript.path)
+            say("\nРеплик: ${utterances.size}, спикеров: ${utterances.map { it.speakerId }.distinct().size}")
+            utterances.take(20).forEach { say("[${it.startMs / 1000}s] ${it.speakerId}: ${it.text}") }
+        }
+
+        // Полная обработка: чтение, диаризация, распознавание и склейка. Установка моделей (первый запуск) не входит.
+        val processingMs = listOf("decode", "diar_load", "diarization", "load", "asr", "merge")
+            .sumOf { if (timings.has(it)) timings.getLong(it) else 0L }
         val rtf = processingMs / 1000.0 / seconds
         report.put("audio_seconds", seconds).put("chunks", chunks.size).put("timings_ms", timings)
             .put("peak_rss_mb", peaks).put("processing_ms", processingMs).put("rtf", rtf)
             .put("word_count", words.size).put("device", "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
             .put("words", JSONArray(words.map { JSONObject().put("text", it.text).put("start_ms", it.startMs).put("end_ms", it.endMs) }))
 
-        val safeName = name.replace(Regex("[^\\w.-]"), "_")
         val file = File(getExternalFilesDir(null), "bench_$safeName.$threads.json")
         file.writeText(report.toString(2))
         say("\nСлов: ${words.size}, RTF: %.3f\nФайл: ${file.path}\n".format(rtf))
@@ -148,6 +191,7 @@ class MainActivity : ComponentActivity() {
         const val TAG = "SpeechBench"
         const val EXTRA_FILE = "file"
         const val EXTRA_THREADS = "threads"
+        const val EXTRA_DIARIZE = "diarize"
         const val DEFAULT_THREADS = 4
     }
 }

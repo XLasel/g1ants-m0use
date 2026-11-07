@@ -7,3 +7,5 @@ local.properties
 speech/libs/*.aar
 speech/src/main/assets/models/
 .kotlin/
+# Модель диаризации: её кладёт scripts/prepare_diarization.sh
+app/src/main/assets/models/nemotron/
