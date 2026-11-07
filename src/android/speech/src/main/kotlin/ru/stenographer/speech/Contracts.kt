@@ -5,8 +5,8 @@ import android.net.Uri
 /** Частота звука, которую ждут модели. */
 const val SAMPLE_RATE = 16_000
 
-/** Слово с таймкодами от начала записи, в миллисекундах. */
-data class Word(val text: String, val startMs: Long, val endMs: Long)
+/** Слово с таймкодами от начала записи, в миллисекундах. Общий тип из `:core`, здесь только короткое имя. */
+typealias Word = ru.stenographer.core.Word
 
 /** Превращает файл в звук 16 кГц, моно, со значениями от -1 до 1. */
 interface AudioDecoder {

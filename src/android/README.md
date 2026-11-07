@@ -75,29 +75,23 @@ adb pull /sdcard/Android/data/ru.stenographer.speechbench/files/bench_test_2.m4a
 python3 scripts/compare_words.py bench_test_2.m4a.4.json ../voicerec-original/results/onnx/test_2.int8.json
 ```
 
-## Диаризация в замере (роль 3)
+## Вся обработка в замере
 
-Бенч по умолчанию гоняет всю цепочку: Nemotron → куски речи → GigaAM → реплики. Модуль `diarization` описан в `diarization/README.md`.
+Бенч гоняет ту же обработку, что и приложение: `TranscriptionPipeline` из `:pipeline` (чтение → диаризация → куски речи → GigaAM → реплики → конспект), и меряет её по событиям. Модули описаны в `pipeline/README.md`, `diarization/README.md`, `core/README.md`.
 
-Модель диаризации (около 106 МБ) кладётся отдельно: скрипт ищет `voicerec-original/models_onnx` рядом с репозиторием или рядом с папкой `android`, путь можно передать аргументом.
+Модель диаризации (около 106 МБ) кладётся в assets `:pipeline` отдельно: скрипт ищет `voicerec-original/models_onnx` рядом с репозиторием или рядом с папкой `android`, путь можно передать аргументом. Для `:summary-android` нужны NDK 29.0.13113456, CMake 3.22.1 и исходники llama.cpp: `python summary-android/scripts/prepare_llama.py`.
 
 ```bash
 ./scripts/prepare_diarization.sh
 ```
 
-Запуск с диаризацией такой же, как выше. Без неё (старый замер только ASR) — с `--ez diarize false`:
+Запуск такой же, как выше. Конспект — если положить GGUF-модель в папку приложения и добавить `--es summary_model имя.gguf`.
 
-```bash
-adb shell am start -n ru.stenographer.speechbench/.MainActivity --es file test_2.m4a --ei threads 4
-```
-
-Кроме `bench_*.json` появится `transcript_test_2.m4a.json` в формате задания. В `bench_*.json` добавлены этапы `diar_install`, `diar_load`, `diarization`, `merge` и число спикеров, а `processing_ms` теперь включает диаризацию и склейку.
+Кроме `bench_*.json` появятся `transcript_test_2.m4a.json` в формате задания и `summary_*.json`, если был конспект. В `bench_*.json`: время и пик памяти по этапам `decode`, `diarize`, `recognize`, `merge`, `summary` (с установкой и загрузкой моделей), `transcription_ms` и `rtf` до готовой расшифровки, события с моментами прихода (`events`), слова.
 
 ```bash
 adb pull /sdcard/Android/data/ru.stenographer.speechbench/files/transcript_test_2.m4a.json
 ```
-
-Что проверить первым: APK запускается и обе модели работают в одном процессе (`onnxruntime-android` рядом со статическим ONNX Runtime внутри sherpa-onnx). Если падает при загрузке `libonnxruntime.so` или на первом `diarize`, пришлите `adb logcat`.
 
 ## Как подключить в приложение
 

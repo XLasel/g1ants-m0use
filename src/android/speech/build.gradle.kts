@@ -15,6 +15,8 @@ android {
 }
 
 dependencies {
+    // Общие модели (Word): api, чтобы они были видны всем, кто зависит от speech.
+    api(project(":core"))
     // Вариант со статически встроенным ONNX Runtime: в нём нет своего libonnxruntime.so,
     // поэтому он не должен конфликтовать с onnxruntime-android у диаризации. Проверить в одном APK.
     implementation(":sherpa-onnx-static-link-onnxruntime:2.0.1@aar")

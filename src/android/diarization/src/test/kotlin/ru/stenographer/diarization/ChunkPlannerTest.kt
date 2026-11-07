@@ -1,5 +1,6 @@
 package ru.stenographer.diarization
 
+import ru.stenographer.core.SAMPLE_RATE
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals

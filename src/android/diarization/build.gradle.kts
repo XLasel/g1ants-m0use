@@ -14,6 +14,8 @@ val onnxRuntime = "1.22.0"
 val onnxRuntimeTest = (findProperty("ortTestVersion") as String?) ?: "1.18.0"
 
 dependencies {
+    // Общие модели: Word, Segment, Utterance. api — чтобы зависящим от диаризации они были видны сразу.
+    api(project(":core"))
     // Модуль не тянет рантайм сам: на телефоне его даёт onnxruntime-android, в тестах — обычный onnxruntime.
     // API у обоих одинаковый (пакет ai.onnxruntime).
     compileOnly("com.microsoft.onnxruntime:onnxruntime:$onnxRuntime")

@@ -17,5 +17,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "stenographer"
-include(":speech", ":diarization", ":bench")
+include(":core", ":speech", ":diarization", ":pipeline", ":bench")
 include(":summary", ":summary-android")

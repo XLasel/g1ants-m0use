@@ -1,19 +1,9 @@
-package ru.stenographer.diarization
+package ru.stenographer.core
 
 /**
- * Перенумеровывает спикеров по порядку первой реплики: speaker_1 — тот, кто заговорил первым, номера без пропусков.
- * Nemotron и так нумерует по появлению, но столбец, не попавший ни в одно слово, оставил бы дыру в номерах.
+ * Экспорт в формат задания (слайд 15): `{"transcript": [{"speaker_id", "start_ms", "end_ms", "text"}]}`.
+ * По этому файлу эксперты считают точность, поэтому лишних полей в нём нет.
  */
-fun List<Utterance>.renumberSpeakers(): List<Utterance> {
-    val order = HashMap<Int, Int>()
-    for (u in sortedBy { it.startMs }) order.getOrPut(u.speaker) { order.size }
-    return map { u ->
-        val speaker = order.getValue(u.speaker)
-        u.copy(speaker = speaker, words = u.words.map { it.copy(speaker = speaker) })
-    }
-}
-
-/** Экспорт в формат задания (слайд 15): `{"transcript": [{"speaker_id", "start_ms", "end_ms", "text"}]}`. */
 object TranscriptJson {
     fun encode(utterances: List<Utterance>, indent: Boolean = true): String {
         val nl = if (indent) "\n" else ""

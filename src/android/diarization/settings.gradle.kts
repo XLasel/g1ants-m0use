@@ -17,3 +17,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "diarization"
+
+// Как в общем проекте: :core лежит рядом
+include(":core")
+project(":core").projectDir = file("../core")

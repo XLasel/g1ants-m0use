@@ -1,4 +1,4 @@
-package ru.stenographer.speechbench
+package ru.stenographer.pipeline
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
@@ -11,7 +11,7 @@ import java.io.IOException
  * Копирует модель диаризации из assets во внутреннюю память: ONNX Runtime открывает модель по пути к файлу.
  * Устроен так же, как ModelInstaller из speech. Модель кладёт scripts/prepare_diarization.sh.
  */
-class NemotronInstaller(private val context: Context) {
+internal class NemotronInstaller(private val context: Context) {
 
     suspend fun install(): File = withContext(Dispatchers.IO) {
         val target = File(context.filesDir, "models/$VERSION")
