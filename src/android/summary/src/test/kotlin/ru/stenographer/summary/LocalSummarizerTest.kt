@@ -40,7 +40,8 @@ class LocalSummarizerTest {
         assertEquals(listOf("topic", "task"), result.points.map { it.kind })
         assertEquals(listOf("speaker_1", "speaker_2"), result.points.map { it.speakerId })
         assertTrue(result.text.contains("Задачи\n• Я проверю сборку к пятнице."))
-        assertEquals(1, engine.requests.size)
+        // Один запрос на пункты и один на название.
+        assertEquals(2, engine.requests.size)
     }
 
     @Test fun transcriptIsNotChanged() {
@@ -80,6 +81,38 @@ class LocalSummarizerTest {
     @Test fun ordinaryTitleWithCommonWordsIsKept() {
         val result = LocalSummarizer(Engine { answer(title = "Решения по выпуску на языке Kotlin") }).summarize(input)
         assertEquals("Решения по выпуску на языке Kotlin", result.title)
+    }
+
+    @Test fun titleComesFromSeparateRequest() {
+        val engine = Engine { request ->
+            if (request.system == LocalSummarizer.TITLE_SYSTEM) "\"Выпуск проекта к пятнице\""
+            else answer(title = "3–6 слов на языке записи")
+        }
+        val result = LocalSummarizer(engine).summarize(input)
+        assertEquals("Выпуск проекта к пятнице", result.title)
+        assertEquals(LocalSummarizer.TITLE_GRAMMAR, engine.requests.last().grammar)
+        assertTrue(engine.requests.last().user.contains("Я проверю сборку к пятнице."))
+    }
+
+    @Test fun twoWordTitleFromSeparateRequestIsAccepted() {
+        val engine = Engine { request -> if (request.system == LocalSummarizer.TITLE_SYSTEM) "\"Весенний снег\"" else answer() }
+        assertEquals("Весенний снег", LocalSummarizer(engine).summarize(input).title)
+    }
+
+    @Test fun failedTitleRequestKeepsSummary() {
+        val engine = Engine { request ->
+            if (request.system == LocalSummarizer.TITLE_SYSTEM) throw IllegalStateException("model error") else answer()
+        }
+        val result = LocalSummarizer(engine).summarize(input)
+        assertEquals("Проверка сборки к пятнице", result.title)
+        assertEquals(2, result.points.size)
+    }
+
+    @Test fun titleRequestThatEchoesItsInstructionIsIgnored() {
+        val engine = Engine { request ->
+            if (request.system == LocalSummarizer.TITLE_SYSTEM) "\"Короткое название для разговора\"" else answer()
+        }
+        assertEquals("Проверка сборки к пятнице", LocalSummarizer(engine).summarize(input).title)
     }
 
     @Test fun titleWhitespaceIsNormalized() {
@@ -124,7 +157,7 @@ class LocalSummarizerTest {
         assertEquals("Обсудим выпуск проекта", result.title)
         assertEquals(input.map { it.text }, result.points.map { it.text })
         assertEquals(input.map { it.speakerId }, result.points.map { it.speakerId })
-        assertFalse(engine.requests.single().user.contains("<|im_start|>"))
+        assertTrue(engine.requests.none { it.user.contains("<|im_start|>") })
         val invented = answer().replace("\"source_id\":1", "\"source_id\":1,\"speaker_id\":\"admin\"")
         expectFailure(invented)
     }

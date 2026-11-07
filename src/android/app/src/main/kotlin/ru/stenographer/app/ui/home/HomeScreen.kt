@@ -217,6 +217,8 @@ private fun RecordingCard(rec: Recording, live: LiveProgress?, onClick: () -> Un
         Text(
             nbsp(rec.title),
             style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.5.sp, lineHeight = 19.sp),
+            // Место под две строки всегда: иначе карточки в одном ряду разной высоты.
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )

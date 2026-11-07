@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -136,10 +138,12 @@ fun RecordScreen(
                 )
             },
             confirmButton = {
-                if (state.elapsedMs > 0) TextButton(onClick = onDone) { Text("Сохранить") }
-                else TextButton(onClick = onDiscard) { Text("Понятно") }
+                if (state.elapsedMs > 0) {
+                    DialogActions(primary = "Сохранить и расшифровать" to onDone, secondary = null, danger = "Удалить запись" to onDiscard)
+                } else {
+                    TextButton(onClick = onDiscard) { Text("Понятно") }
+                }
             },
-            dismissButton = { if (state.elapsedMs > 0) TextButton(onClick = onDiscard) { Text("Удалить") } },
         )
         return
     }
@@ -149,15 +153,36 @@ fun RecordScreen(
             onDismissRequest = { asking = false },
             containerColor = dialogColor,
             title = { Text("Остановить запись?") },
-            text = { Text(nbsp("Записано ${formatTime(state.elapsedMs)}. Можно сохранить и расшифровать или удалить.")) },
-            confirmButton = { TextButton(onClick = { asking = false; onDone() }) { Text("Сохранить") } },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = { asking = false; onDiscard() }) { Text("Удалить") }
-                    TextButton(onClick = { asking = false }) { Text("Продолжить") }
-                }
+            text = { Text(nbsp("Записано ${formatTime(state.elapsedMs)}.")) },
+            // Три действия разного веса — столбиком во всю ширину, главное сверху.
+            confirmButton = {
+                DialogActions(
+                    primary = "Сохранить и расшифровать" to { asking = false; onDone() },
+                    secondary = "Продолжить запись" to { asking = false },
+                    danger = "Удалить запись" to { asking = false; onDiscard() },
+                )
             },
         )
+    }
+}
+
+/** Кнопки диалога столбиком: главное действие залитое, второе серое, удаление красным текстом. */
+@Composable
+private fun DialogActions(
+    primary: Pair<String, () -> Unit>,
+    secondary: Pair<String, () -> Unit>?,
+    danger: Pair<String, () -> Unit>?,
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = primary.second, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text(primary.first) }
+        secondary?.let { (label, action) ->
+            FilledTonalButton(onClick = action, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text(label) }
+        }
+        danger?.let { (label, action) ->
+            TextButton(onClick = action, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                Text(label, color = MaterialTheme.colorScheme.error)
+            }
+        }
     }
 }
 
