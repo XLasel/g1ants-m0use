@@ -29,7 +29,7 @@
 | `ModelInstaller.kt` | Копирование модели из APK во внутреннюю память |
 | `SherpaRecognizer.kt` | GigaAM v3 через sherpa-onnx |
 | `TokenWords.kt` | Токены → слова с таймкодами |
-| `QuietChunker.kt` | Временная нарезка, пока нет `plan_chunks` от роли 3 |
+| `QuietChunker.kt` | Нарезка по самым тихим местам; в итоговой обработке куски задаёт диаризация (`ChunkPlanner`) |
 
 ## Как собрать
 
