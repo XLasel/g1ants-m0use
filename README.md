@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| Видео работы, 4 минуты | [YouTube](https://youtu.be/itV-d0b9lzE), [файл в репозитории](artifacts/demo/replika-demo.mp4) |
+| Видео работы, 4 минуты | [YouTube](https://youtu.be/itV-d0b9lzE), [Google Диск](https://drive.google.com/file/d/1FPcVJcxUDc--eD8Ki4N8WsjDuOupnEif/view?usp=drive_link) |
 | APK | [replika-v1.0.apk](https://github.com/XLasel/g1ants-m0use/releases/download/v1.0/replika-v1.0.apk), 943 МБ, [релиз v1.0](https://github.com/XLasel/g1ants-m0use/releases/tag/v1.0) |
 | Установка и использование | [ниже](#установка) |
 | Архитектура и модели | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
