@@ -160,32 +160,30 @@ val words = SherpaRecognizer.open(modelDir, threads = 4).use { asr ->
 
 ## Итоговый APK со всеми моделями
 
-Жюри устанавливает один APK. Ручной `adb push` GGUF выше нужен только для
-диагностического сравнения моделей; в итоговом приложении он не используется.
-GigaAM и четыре файла Nemotron подготавливаются скриптами выше. Для базового
-проверенного Qwen можно сразу скачать GGUF в assets:
+Жюри устанавливает один APK, все модели внутри. Так собран `replika-v1.0.apk` из релиза v1.0.
+Нужны Android SDK 36, NDK 29.0.13113456, CMake 3.22.1 и JDK 17+. Команды — из папки `src/android`.
 
 ```bash
+# Распознавание: AAR sherpa-onnx и GigaAM v3 скачиваются скриптом
+./scripts/prepare_speech.sh
+# Голоса: четыре файла Nemotron (embed.onnx, step_int8.onnx, mel_filters.bin, silence_embeds.bin)
+./scripts/prepare_diarization.sh путь/к/models_onnx
+# Конспект: исходники llama.cpp и модель Qwen2.5-0.5B-Instruct Q4_K_M
 python summary-android/scripts/prepare_llama.py
-python summary-android/scripts/prepare_summary_model.py --output pipeline/src/main/assets/models/summary/summary.gguf
-```
-
-Это официальный кандидат Qwen2.5-1.5B Q4_K_M с проверкой SHA-256. Если по
-замерам на Pixel выбрана другая модель, в тот же asset кладётся её проверенный
-GGUF. Скрипт `scripts/prepare_summary.sh` в обновлении Артёма принимает путь к
-локальному выбранному GGUF и делает копию в этот каталог. Одновременно хранить
-несколько вариантов в итоговом APK не нужно. Каталог исключён из Git.
-
-В приложении нужны `noCompress += listOf("onnx", "gguf")`, установка GGUF из
-assets во внутреннюю память и включённый конспект. Наличие ASR-результата само
-по себе не подтверждает работу обязательной локальной LLM.
-
-После интеграции ветки приложения:
-
-```bash
+curl -L -o qwen2.5-0.5b-instruct-q4_k_m.gguf \
+  "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+shasum -a 256 qwen2.5-0.5b-instruct-q4_k_m.gguf
+# 74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db
+./scripts/prepare_summary.sh qwen2.5-0.5b-instruct-q4_k_m.gguf
+# Сборка и установка
 ./gradlew :app:assembleRelease
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
+
+Модель конспекта выбрана по замеру на Pixel 7 Pro: Qwen2.5-0.5B даёт конспект за 53 с при 0,82 ГБ памяти,
+1.5B — за 101 с при 1,46 ГБ при том же числе пунктов. Скрипт `prepare_summary_model.py` по умолчанию скачивает
+1.5B и нужен только для сравнения моделей. Каталоги с моделями исключены из Git. Без модели конспекта APK
+тоже собирается и работает, но названия и конспекта не будет, а локальная LLM обязательна по условиям задачи.
 
 Для замера первой установки используют чистое состояние приложения, для
 повторного прогона — то же установленное приложение. Не объединяйте эти
